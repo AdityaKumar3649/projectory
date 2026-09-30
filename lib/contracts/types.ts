@@ -66,7 +66,12 @@ export interface AuthUser {
   email: string;
   name: string;
   avatarUrl: string;
-  /** True when the identity came from Clerk, false for the local fallback. */
+  /**
+   * True only for the seeded `user_demo` account, whose projects and password
+   * are published in the README. It drives the "Demo" chip in the nav and the
+   * extra explainer on the account panel. It is NOT a provider flag: a Clerk
+   * user is `false`, and so is any real local sign-up.
+   */
   isDemo: boolean;
 }
 

@@ -139,6 +139,82 @@ input, and scrolling to the end reaches it.
 
 ---
 
+## Rounds 8-10 - bug hunt and completeness audit
+
+Three further rounds, driven by using the deployed app rather than reading the
+code. A parallel audit also checked every Member 1 line in the plan.
+
+### Bugs found and fixed in these rounds
+
+| # | Bug | Why it mattered |
+| --- | --- | --- |
+| 1 | `/terms` and `/privacy` were **404 links** under the sign-up checkbox | The user was asked to agree to documents that did not exist. Both now return 200 with real pages. |
+| 2 | The terms checkbox was **not enforced** anywhere | A decorative consent control. Now gated in the form *and* rejected by `signUpAction`, because the request can be posted without loading the page. |
+| 3 | "Remember me" was **decorative** | The checkbox posted nothing and every cookie lasted 30 days regardless. It now sends a flag and selects between a persistent cookie and a session cookie. |
+| 4 | "Continue with GitHub" was a **dead button** on both auth screens | Two visible controls that silently did nothing. Removed rather than shipped disabled - OAuth is not in the plan and Clerk is the named provider. |
+| 5 | Sign-in / sign-up Zod schemas were **hand-copied** | The plan requires schemas "defined once per entity and reused consistently". Editing one would have silently diverged from the server. Extracted to `lib/auth/schemas.ts`; both forms and `lib/auth/service.ts` import the same objects now. |
+| 6 | `getMyProfile` did not exist | The plan names it in the Server Actions list. Added, and it refuses a `userId` that disagrees with the session rather than ignoring the argument. |
+| 7 | `AuthUser.isDemo` was **documented backwards** | The comment said it meant "came from Clerk"; the code does the opposite. It is the seeded demo-account flag. |
+| 8 | A stale claim in this document | It said the signed-in bounce happens in `proxy.ts`; it happens in `app/(auth)/layout.tsx` since the redirect-loop fix. |
+
+### Round 8 - new member, full journey
+
+Signed out, from a clean context: `/` -> sign-in; `/dashboard`, `/settings` and
+`/dashboard/new` all blocked with `?next=` preserved. Signed up, got the empty
+state (0/0/0/0), created a project with all six fields and three tags (1/1/0/0,
+status Pending), confirmed the edit form prefills every field including tags and
+shows the status strip and danger zone, saved an edit, saved a profile
+("Profile updated.", member-since rendered), opened the delete dialog (native
+`<dialog>`, focus correctly trapped inside, project named in the copy) and
+deleted.
+
+### Round 9 - design and dark mode, every screen
+
+Ten screen/theme combinations, signed out for the auth and legal pages. The
+first attempt at this round was **invalid**: the browser was still signed in, so
+`/sign-in` silently bounced to the dashboard and those pages were never actually
+tested. Re-run signed out:
+
+| Route | dark | light |
+| --- | --- | --- |
+| `/sign-in` | 21 text, 0 fails | 21 text, 0 fails |
+| `/sign-up` | 24 text, 0 fails | 24 text, 0 fails |
+| `/terms` | 10 text, 0 fails | 10 text, 0 fails |
+| `/privacy` | 11 text, 0 fails | 11 text, 0 fails |
+| `/dashboard` | 30 text, 0 fails | 30 text, 0 fails |
+| `/dashboard/new` | 43 text, 0 fails | 43 text, 0 fails |
+| `/settings` | 45 text, 0 fails | 45 text, 0 fails |
+
+0px horizontal overflow and 0 offending elements everywhere. 0 console errors.
+
+### Round 10 - hostile input and error states
+
+| Attack | Result |
+| --- | --- |
+| `<script>window.__pwned=1</script>` + 200 A's as title | Rejected: "Title must be 120 characters or fewer". `window.__pwned` undefined. |
+| `<img src=x onerror=alert(1)>` as title (passes validation) | Created. Renders as a **single text node**; 0 `<img>` and 0 `<script>` elements in the page; nothing executed. |
+| Unicode + emoji in description | Accepted and rendered correctly. |
+| `/dashboard/prj_does_not_exist/edit` | "Project not found" page, not a crash. |
+| `?next=https://evil.example/pwn` | Blocked by `safeNext`; only same-origin relative paths accepted. |
+
+My first XSS check reported "**UNESCAPED**" by searching the HTML source for
+`onerror=alert`. That was a false alarm: React escapes the angle brackets, so
+the escaped text still contains that substring. Inspecting the DOM properly
+showed one `#text` node and zero elements. The test was wrong, not the app.
+
+### Still not verified
+
+- **The remember-me cookie lifetime.** The form sends the flag and the action
+  branches on it, but the Playwright harness filters the `Set-Cookie` response
+  header entirely - on localhost as well as through the tunnel - so the
+  resulting cookie could not be inspected. A behavioural test using
+  `browser_close` was inconclusive, because that wipes the whole context,
+  persistent cookies included. Read and reviewed, not measured.
+- **Automated tests.** None exist. Every check in this document was run by hand
+  in a browser. Plan item 8.13 is satisfied by this report, not by a test suite.
+
+---
+
 ## Member 1 criteria
 
 ### 1. Authentication works (sign in, sign out, session persists)
@@ -148,7 +224,7 @@ input, and scrolling to the end reaches it.
 | Sign in with the demo account | Redirects to `/dashboard` |
 | Session survives a full page reload | Still authenticated after reload |
 | Sign out | Redirects to `/sign-in`, "Welcome back" |
-| Signed-in user visits `/sign-up` | Bounced to `/dashboard` by `proxy.ts` |
+| Signed-in visitor → `/sign-in` or `/sign-up` | Bounced to `/dashboard` (in `app/(auth)/layout.tsx`, not `proxy.ts` — see the note below) |
 | Sign up with a new email | Account created, lands on an empty dashboard |
 
 **Bug found and fixed during this test.** Sign out did nothing. The cause was in

@@ -3,29 +3,21 @@
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 
 import { signInAction, type AuthFormState } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/primitives";
-
-/**
- * Mirrors `signInSchema` in `lib/auth/service.ts` so the browser and the
- * server reject exactly the same input. Zod 4 note: messages use `{ error }`.
- */
-const schema = z.object({
-  email: z.email({ error: "Enter a valid email address" }),
-  password: z.string().min(1, { error: "Enter your password" }),
-});
-
-type Values = z.infer<typeof schema>;
+import { signInSchema, type SignInValues as Values } from "@/lib/auth/schemas";
 
 export function SignInForm({ next }: { next?: string }) {
   const [state, setState] = useState<AuthFormState>(null);
   const [pending, startTransition] = useTransition();
+  const [remember, setRemember] = useState(true);
   const form = useForm<Values>({
-    resolver: zodResolver(schema),
+    // The shared schema, not a local copy: lib/auth/service.ts imports the data
+    // store and so is server-only, which is why these used to be duplicated.
+    resolver: zodResolver(signInSchema),
     mode: "onTouched",
     reValidateMode: "onChange",
     defaultValues: { email: "", password: "" },
@@ -42,6 +34,7 @@ export function SignInForm({ next }: { next?: string }) {
       const fd = new FormData();
       fd.set("email", values.email);
       fd.set("password", values.password);
+      fd.set("remember", remember ? "1" : "0");
       fd.set("next", next ?? "");
       const result = await signInAction(null, fd);
       if (result?.error) {
@@ -82,6 +75,12 @@ export function SignInForm({ next }: { next?: string }) {
         />
       </Field>
 
+      {/*
+        This used to be decorative: it posted nothing and the cookie TTL was a
+        hardcoded 30 days. It now sets a real `remember` flag, which the action
+        uses to pick between a persistent cookie and a session cookie that
+        expires when the browser closes.
+      */}
       <label
         htmlFor="sign-in-remember"
         className="flex cursor-pointer items-center gap-2.5 text-[13px] text-ink-2"
@@ -90,10 +89,11 @@ export function SignInForm({ next }: { next?: string }) {
           id="sign-in-remember"
           name="remember"
           type="checkbox"
-          defaultChecked
+          checked={remember}
+          onChange={(event) => setRemember(event.target.checked)}
           className="size-4 shrink-0 cursor-pointer rounded border border-line accent-accent"
         />
-        Remember me
+        Keep me signed in
       </label>
 
       <Button type="submit" size="lg" block disabled={pending}>
@@ -105,17 +105,12 @@ export function SignInForm({ next }: { next?: string }) {
         Demo account: <span className="font-mono">demo@projectory.app / projectory</span>
       </p>
 
-      <div className="flex items-center gap-3">
-        <span aria-hidden className="h-px flex-1 bg-hairline" />
-        <span className="text-xs text-ink-3">or</span>
-        <span aria-hidden className="h-px flex-1 bg-hairline" />
-      </div>
-
-      {/* OAuth is not wired up yet. `type="button"` keeps it out of the submit
-          path so it can never post credentials to the credentials action. */}
-      <Button type="button" variant="secondary" size="lg" block>
-        Continue with GitHub
-      </Button>
+      {/*
+        The "Continue with GitHub" button was removed rather than left as a dead
+        control. OAuth is not part of the plan, Clerk is the named provider, and
+        a button that silently does nothing is worse than no button. When social
+        login is added it belongs here, alongside the Clerk wiring.
+      */}
     </form>
   );
 }

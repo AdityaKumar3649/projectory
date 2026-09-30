@@ -1,8 +1,7 @@
-import { z } from "zod";
-
 import type { AuthUser } from "@/lib/contracts/types";
 import { hashPassword, newId, readDb, verifyPassword, withDb } from "@/lib/data/store";
 import { createSession } from "@/lib/auth/session";
+import { authFieldErrors, signInSchema, signUpSchema } from "@/lib/auth/schemas";
 
 /**
  * Credentials auth for the local provider.
@@ -10,37 +9,25 @@ import { createSession } from "@/lib/auth/session";
  * Clerk owns authentication in the target stack. This exists so Member 1's
  * half of the app is fully runnable and demoable on day one, without waiting
  * on an external account. `lib/auth/index.ts` picks a provider at runtime, so
- * this file is deleted the day Clerk keys exist.
+ * this file is dead code the day Clerk keys exist.
+ *
+ * The schemas are NOT defined here — they live in `lib/auth/schemas.ts` so the
+ * sign-in and sign-up forms import the exact same objects rather than keeping
+ * hand-copied versions in step by hand.
  */
-
-export const signUpSchema = z.object({
-  name: z.string().trim().min(2, { error: "Name must be at least 2 characters" }).max(50),
-  email: z.email({ error: "Enter a valid email address" }).trim().toLowerCase(),
-  password: z.string().min(8, { error: "Password must be at least 8 characters" }).max(200),
-});
-
-export const signInSchema = z.object({
-  email: z.email({ error: "Enter a valid email address" }).trim().toLowerCase(),
-  password: z.string().min(1, { error: "Enter your password" }),
-});
 
 export type LocalAuthOutcome =
   | { ok: true; user: AuthUser; token: string; expiresAt: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
-function fieldErrorsOf(error: z.ZodError): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const issue of error.issues) {
-    const key = String(issue.path[0] ?? "_form");
-    if (!(key in out)) out[key] = issue.message;
-  }
-  return out;
-}
-
 export async function localSignUp(raw: unknown): Promise<LocalAuthOutcome> {
   const parsed = signUpSchema.safeParse(raw);
   if (!parsed.success) {
-    return { ok: false, error: "Please fix the highlighted fields.", fieldErrors: fieldErrorsOf(parsed.error) };
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: authFieldErrors(parsed.error),
+    };
   }
   const { name, email, password } = parsed.data;
 
@@ -85,7 +72,11 @@ export async function localSignUp(raw: unknown): Promise<LocalAuthOutcome> {
 export async function localSignIn(raw: unknown): Promise<LocalAuthOutcome> {
   const parsed = signInSchema.safeParse(raw);
   if (!parsed.success) {
-    return { ok: false, error: "Enter your email and password.", fieldErrors: fieldErrorsOf(parsed.error) };
+    return {
+      ok: false,
+      error: "Enter your email and password.",
+      fieldErrors: authFieldErrors(parsed.error),
+    };
   }
   const { email, password } = parsed.data;
 
