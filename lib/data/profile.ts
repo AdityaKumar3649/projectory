@@ -1,6 +1,6 @@
 import type { ActionResult, UserProfile, UserProfileInput } from "@/lib/contracts/types";
 import { parseOrFieldErrors, profileInputSchema } from "@/lib/validators/project";
-import { readDb, withDb } from "@/lib/data/store";
+import { readDbQueued, withDb } from "@/lib/data/store";
 
 /**
  * Profile half of the Member 1 <-> Member 3 contract.
@@ -24,7 +24,7 @@ const emptyProfile = (userId: string, email: string): UserProfile => ({
 });
 
 export async function getProfile(userId: string, email = ""): Promise<UserProfile> {
-  const db = await readDb();
+  const db = await readDbQueued();
   return db.profiles.find((p) => p.userId === userId) ?? emptyProfile(userId, email);
 }
 

@@ -3,7 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 
 import type { AuthUser } from "@/lib/contracts/types";
-import { readDb } from "@/lib/data/store";
+import { readDbQueued } from "@/lib/data/store";
 import { SESSION_COOKIE, resolveSession } from "@/lib/auth/session";
 import { authMode, clerkEnabled, type AuthMode } from "@/lib/auth/mode";
 
@@ -43,7 +43,7 @@ async function localUser(): Promise<AuthUser | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const userId = await resolveSession(token);
   if (!userId) return null;
-  const db = await readDb();
+  const db = await readDbQueued();
   const account = db.accounts.find((a) => a.id === userId);
   if (!account) return null;
   return {

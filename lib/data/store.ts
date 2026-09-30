@@ -233,25 +233,63 @@ async function ensureDb(): Promise<void> {
     await fs.access(DB_FILE);
   } catch {
     await fs.mkdir(DATA_DIR, { recursive: true });
-    await fs.writeFile(DB_FILE, JSON.stringify(seed(), null, 2), "utf8");
+    await writeAtomic(seed());
+  }
+}
+
+async function reseed() {
+  if (!(await canWrite())) {
+    memory = seed();
+    return;
+  }
+  const fs = await import("node:fs/promises");
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await writeAtomic(seed());
+  console.warn(
+    "[projectory] Local store was unreadable and has been re-seeded. " +
+      "Delete .data/db.json to reset at any time.",
+  );
+}
+
+/**
+ * Writes via a temp file and an atomic rename.
+ *
+ * `fs.writeFile` truncates the target before it writes, so for a window of time
+ * the file on disk is half a document. A plain read landing in that window fails
+ * to parse. That is not hypothetical: the server log showed the re-seed path
+ * firing fifteen times in a row, each one replacing the user's data with the
+ * demo seed. `rename` within a directory is atomic, so a reader sees either the
+ * old file or the new one, never a torn one.
+ */
+async function writeAtomic(db: DbShape): Promise<void> {
+  const fs = await import("node:fs/promises");
+  const tmp = `${DB_FILE}.${process.pid}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(db, null, 2), "utf8");
+  try {
+    await fs.rename(tmp, DB_FILE);
+  } catch (error) {
+    // Windows can refuse a rename onto an existing file.
+    await fs.rm(tmp, { force: true }).catch(() => {});
+    await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+    throw error;
   }
 }
 
 /**
- * Reads the store, and re-seeds it if the file is missing or unreadable.
+ * Reads the store, and re-seeds only when the file is genuinely unusable.
  *
- * The corruption case matters: a truncated write, a stray editor, or a manual
- * edit leaves invalid JSON, and a bare `JSON.parse` throws on every subsequent
- * request. Because the file is the database, that turns one bad byte into a
- * permanently broken app with no way back in through the UI. Re-seeding instead
- * means a bad file costs the demo data and nothing else.
+ * A parse failure is NOT treated as "the database is corrupt, throw it away".
+ * It is far more likely to be a torn read or a half-finished write, and
+ * re-seeding on that would destroy real data. When a good snapshot is already
+ * in memory it is returned instead, and the file is left alone so the next
+ * successful write repairs it.
  *
- * A structurally wrong but parseable file is caught too — a half-written object
+ * A structurally wrong but parseable file is caught too - a half-written object
  * missing `projects` would otherwise fail deep inside a query with a confusing
  * message rather than here.
  *
- * With no writable filesystem, the in-memory copy is the database: it is seeded
- * on first read and mutated in place by `withDb`.
+ * With no writable filesystem the in-memory copy is the database: seeded on
+ * first read and mutated in place by `withDb`.
  */
 export async function readDb(): Promise<DbShape> {
   if (!(await canWrite())) {
@@ -262,44 +300,50 @@ export async function readDb(): Promise<DbShape> {
   await ensureDb();
   const fs = await import("node:fs/promises");
 
-  let parsed: unknown;
+  let raw: string;
   try {
-    parsed = JSON.parse(await fs.readFile(DB_FILE, "utf8"));
+    raw = await fs.readFile(DB_FILE, "utf8");
   } catch {
     await reseed();
     return seed();
   }
 
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    !Array.isArray((parsed as DbShape).projects) ||
-    !Array.isArray((parsed as DbShape).accounts)
-  ) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    // Keep whatever we last knew to be good rather than destroying it.
+    if (memory) return memory;
     await reseed();
     return seed();
   }
 
-  return parsed as DbShape;
-}
+  const looksRight =
+    typeof parsed === "object" &&
+    parsed !== null &&
+    Array.isArray((parsed as DbShape).projects) &&
+    Array.isArray((parsed as DbShape).accounts);
 
-async function reseed() {
-  if (!(await canWrite())) {
-    memory = seed();
-    return;
+  if (!looksRight) {
+    if (memory) return memory;
+    await reseed();
+    return seed();
   }
-  const fs = await import("node:fs/promises");
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(DB_FILE, JSON.stringify(seed(), null, 2), "utf8");
-  console.warn(
-    "[projectory] Local store was unreadable and has been re-seeded. " +
-      "Delete .data/db.json to reset at any time.",
-  );
+
+  const db = parsed as DbShape;
+  // Cache the last known good snapshot so a later torn read can fall back to it.
+  memory = db;
+  return db;
 }
 
 /**
- * Runs `mutator` against the store and persists the result. Writes are queued
- * so two overlapping Server Actions cannot overwrite one another.
+ * Runs `mutator` against the store and persists the result.
+ *
+ * Every access - reads included - goes through one queue. Reads used to run
+ * outside it, so a plain `getMyProjects` could land in the middle of a write
+ * and observe a half-written file; the re-seed path then replaced the user's
+ * data with the demo seed. Serialising them costs nothing measurable here and
+ * removes the whole class of race.
  *
  * With no writable filesystem the mutator's in-place edit of the shared object
  * IS the persistence, so the write-back is skipped rather than allowed to throw
@@ -310,8 +354,8 @@ export function withDb<T>(mutator: (db: DbShape) => T | Promise<T>): Promise<T> 
     const db = await readDb();
     const result = await mutator(db);
     if (await canWrite()) {
-      const fs = await import("node:fs/promises");
-      await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+      await writeAtomic(db);
+      memory = db;
     }
     return result;
   });
@@ -320,4 +364,9 @@ export function withDb<T>(mutator: (db: DbShape) => T | Promise<T>): Promise<T> 
     () => undefined,
   );
   return run;
+}
+
+/** A read that cannot interleave with a write. */
+export function readDbQueued(): Promise<DbShape> {
+  return withDb((db) => db);
 }

@@ -1,6 +1,6 @@
 import type { ActionResult, Project, ProjectInput, ProjectStatus } from "@/lib/contracts/types";
 import { parseOrFieldErrors, projectInputSchema } from "@/lib/validators/project";
-import { newId, readDb, withDb } from "@/lib/data/store";
+import { newId, readDbQueued, withDb } from "@/lib/data/store";
 
 /**
  * Member 1 <-> Member 3 CONTRACT (see the team plan, section 8).
@@ -123,7 +123,7 @@ export async function deleteProject(
 }
 
 export async function getMyProjects(ownerId: string): Promise<Project[]> {
-  const db = await readDb();
+  const db = await readDbQueued();
   return db.projects
     .filter((p) => p.ownerId === ownerId)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -134,7 +134,7 @@ export async function getProjectForOwner(
   ownerId: string,
   id: string,
 ): Promise<Project | null> {
-  const db = await readDb();
+  const db = await readDbQueued();
   const project = db.projects.find((p) => p.id === id);
   if (!project || project.ownerId !== ownerId) return null;
   return project;

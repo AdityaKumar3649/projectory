@@ -1,5 +1,5 @@
 import type { AuthUser } from "@/lib/contracts/types";
-import { hashPassword, newId, readDb, verifyPassword, withDb } from "@/lib/data/store";
+import { hashPassword, newId, readDbQueued, verifyPassword, withDb } from "@/lib/data/store";
 import { createSession } from "@/lib/auth/session";
 import { authFieldErrors, signInSchema, signUpSchema } from "@/lib/auth/schemas";
 
@@ -31,7 +31,7 @@ export async function localSignUp(raw: unknown): Promise<LocalAuthOutcome> {
   }
   const { name, email, password } = parsed.data;
 
-  const db = await readDb();
+  const db = await readDbQueued();
   if (db.accounts.some((a) => a.email === email)) {
     return {
       ok: false,
@@ -80,7 +80,7 @@ export async function localSignIn(raw: unknown): Promise<LocalAuthOutcome> {
   }
   const { email, password } = parsed.data;
 
-  const db = await readDb();
+  const db = await readDbQueued();
   const account = db.accounts.find((a) => a.email === email);
   // Same message either way so the form cannot be used to discover accounts.
   const invalid: LocalAuthOutcome = {
