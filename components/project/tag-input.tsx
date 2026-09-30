@@ -143,7 +143,15 @@ export function TagInput({
           aria-label="Add a tag"
           aria-invalid={error ? true : undefined}
           aria-describedby={hintId}
-          className="min-w-24 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3 focus-visible:outline-none"
+          /*
+            `self-stretch` so the input fills the box's height instead of sitting
+            as a 20px strip inside a 40px field. Only the strip was clickable
+            before, which made the empty padding above and below it dead space
+            and the tap target under the 24px minimum. Stretching is safe because
+            a bare div does not forward clicks to an input, so the box's own
+            height was never a target to begin with.
+          */
+          className="min-w-24 flex-1 self-stretch bg-transparent py-1 text-sm text-ink outline-none placeholder:text-ink-3 focus-visible:outline-none"
         />
       </div>
 

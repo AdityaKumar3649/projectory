@@ -133,9 +133,10 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
 
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
+      {/* Same tap-target fix as the project form's back-link; see the note there. */}
       <Link
         href="/dashboard"
-        className="flex items-center gap-1.5 text-[13px] text-ink-3 transition-colors hover:text-ink-2"
+        className="-my-1.5 inline-flex items-center gap-1.5 self-start rounded-sm py-1.5 text-[13px] text-ink-3 transition-colors hover:text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <ArrowLeft size={14} className="text-ink-3" aria-hidden />
         Projects

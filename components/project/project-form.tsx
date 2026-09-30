@@ -119,9 +119,16 @@ export function ProjectForm({
 
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
+      {/*
+        `py-1.5 -my-1.5` rather than padding alone. The link's text is 13px, so
+        without vertical padding the tap target is 20px tall - under the 24px
+        minimum, and awkward to hit on a phone. The negative margin keeps the
+        optical spacing identical to before, so the fix costs no vertical
+        rhythm, and `inline-flex` lets the padding take effect on an anchor.
+      */}
       <Link
         href="/dashboard"
-        className="flex items-center gap-1.5 self-start text-[13px] text-ink-3 transition-colors hover:text-ink-2"
+        className="-my-1.5 inline-flex items-center gap-1.5 self-start rounded-sm py-1.5 text-[13px] text-ink-3 transition-colors hover:text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <ArrowLeft size={14} className="text-ink-3" aria-hidden />
         Projects
