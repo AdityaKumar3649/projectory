@@ -1,36 +1,175 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Projectory — Member 1
 
-## Getting Started
+**Authentication, User & Project Management** (the plan's "User Module").
 
-First, run the development server:
+A platform for developers, students and indie makers to publish the projects they
+have built. This repository contains Member 1's half: signing in, a profile, and
+creating / editing / deleting your own projects while tracking their review status.
+
+---
+
+## Quick start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open <http://localhost:3000>. There is nothing to configure — no database to
+provision, no API keys to fetch, no accounts to create.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Demo account**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Field    | Value                  |
+| -------- | ---------------------- |
+| Email    | `demo@projectory.app`  |
+| Password | `projectory`           |
 
-## Learn More
+It is seeded with six projects across all three review states, so the dashboard
+shows real data rather than a wall of empty states. Or sign up with any email and
+password (8+ characters) to get an empty account.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## What is in here
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Screen                | Route                    | Notes                                        |
+| --------------------- | ------------------------ | -------------------------------------------- |
+| Sign in               | `/sign-in`               | Preserves `?next=` so you land where you meant |
+| Sign up               | `/sign-up`               |                                              |
+| Dashboard             | `/dashboard`             | Your projects, filterable by review status    |
+| Create project        | `/dashboard/new`         |                                              |
+| Edit project          | `/dashboard/[id]/edit`   | Owner-only; includes the delete danger zone   |
+| Profile / settings    | `/settings`              | Public details, links, account, sign out      |
 
-## Deploy on Vercel
+Guests hitting `/dashboard` or `/settings` are redirected to sign-in by
+`proxy.ts`, and again by `requireUser()` — the second check is the real one.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## The one architectural decision worth understanding
+
+The team plan gives Member 3 the database and all the Server Actions, and gives
+Member 1 the screens that consume them. Member 3 is not available yet, so this
+half would otherwise be unbuildable and undemoable.
+
+So every piece of data access sits behind **`lib/data/`**, written to the exact
+function signatures the plan specifies:
+
+```ts
+createProject(ownerId, input)      updateProject(ownerId, id, input)
+deleteProject(ownerId, id)         getMyProjects(ownerId)
+getProfile(userId)                 updateProfile(userId, input)
+```
+
+No component, form or page imports `lib/data/` directly for its own logic — they
+go through Server Actions in `app/actions/`, which resolve the owner from the
+**server-side session** and call into `lib/data/`.
+
+Behind `lib/data/` sits a small JSON store (`.data/db.json`, gitignored) that
+hashes passwords with scrypt and keeps server-side sessions. It exists only so the
+UI is runnable today.
+
+### When Member 3's backend lands
+
+1. Delete `.data/db.json` and `lib/data/store.ts`.
+2. Reimplement the exports in `lib/data/projects.ts` and `lib/data/profile.ts`
+   against Drizzle. **Keep the signatures identical.**
+3. Nothing else changes. No page, form or component needs to be touched.
+
+`lib/contracts/types.ts` is the single place the `Project` shape is written down.
+When Member 3's Drizzle schema exists, re-export his inferred types from there
+rather than editing call sites.
+
+### Shared files with Member 3
+
+Per the plan, Member 1 drafts these collaboratively rather than Member 3 owning
+them alone, so the browser and the server cannot drift apart:
+
+- `lib/validators/project.ts` — `projectInputSchema` and `profileInputSchema`
+- `lib/contracts/types.ts` — the `Project` / `UserProfile` shapes
+
+Member 3 should **import** these in his Server Actions, not redeclare them.
+
+---
+
+## Enabling Clerk
+
+The target stack uses Clerk. It needs an external account, so until keys exist
+the app uses a local credentials provider instead. To switch over:
+
+1. Create a free account at <https://clerk.com> and create an application.
+2. Copy `.env.example` to `.env.local` and set both keys:
+
+   ```bash
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+   CLERK_SECRET_KEY=sk_test_...
+   ```
+
+3. Restart the dev server.
+
+`lib/auth/index.ts` detects the keys and `authMode` flips from `"local"` to
+`"clerk"`. `components/auth/providers.tsx` mounts `ClerkProvider` at that point,
+and the sign-in / sign-up pages are the only two places that need their `<SignIn>`
+/ `<SignUp>` components swapped in. Nothing else branches on the provider.
+
+Local auth is then dead code and can be removed: `lib/auth/service.ts`,
+`lib/auth/session.ts` and the `LOCAL` half of `lib/auth/index.ts`.
+
+---
+
+## Design system
+
+Tokens live in `app/globals.css` inside a Tailwind v4 `@theme` block, and the
+source-of-truth design is the pen.dev canvas frame **"Projectory — Design
+System"**. The two are kept in sync deliberately — if you change a value in one,
+change it in the other.
+
+Near-monochrome surfaces, **one** accent (`--color-accent`), and colour reserved
+strictly for review status. Buttons are pill-shaped and get their definition from
+a 1px border, never a drop shadow. The only shadow in the system is `shadow-pop`,
+used by the delete dialog.
+
+Generated utilities: `bg-base` `bg-surface` `bg-sunken` `border-hairline`
+`border-line` `text-ink` `text-ink-2` `text-ink-3` `text-accent` `bg-accent-soft`
+`bg-pending` `text-pending-fg` `bg-approved` `text-approved-fg` `bg-rejected`
+`text-rejected-fg` `rounded-pill` `rounded-input` `rounded-card` `font-mono`.
+
+---
+
+## File ownership (to avoid merge conflicts)
+
+Member 1 owns these outright. **Members 2 and 3 should not edit them:**
+
+- `proxy.ts` · `app/layout.tsx` · `app/globals.css`
+- `app/(auth)/**` · `app/(app)/**` · `app/actions/**`
+- `components/ui/**` · `components/auth/**` · `components/nav/**`
+- `components/dashboard/**` · `components/project/**` · `components/profile/**`
+- `lib/**`
+
+Member 3 owns `db/`, `drizzle/`, and `lib/actions/*`. Note the deliberate split:
+Member 1's Server Actions live in `app/actions/*`, Member 3's in `lib/actions/*`.
+
+---
+
+## Definition of Done
+
+From the plan, section 10:
+
+- [x] Authentication works — sign in, sign out, session persists across refresh
+- [x] Protected routes block unauthenticated access
+- [x] A user can create, edit and delete their own project — and only their own
+- [x] Validation rejects invalid project and profile input
+- [x] The dashboard accurately reflects each project's current status
+
+Verification notes are in [`docs/member1-verification.md`](docs/member1-verification.md).
+
+---
+
+## Notes on this version of the stack
+
+Next.js 16 renamed `middleware.ts` to **`proxy.ts`** and moved to Turbopack by
+default. `cookies()`, `headers()`, `params` and `searchParams` are all async and
+must be awaited. `revalidateTag` now takes a second argument. Auth checks live in
+`lib/auth/index.ts` rather than in a layout, because a layout does not re-render
+on navigation and so cannot be trusted to guard a route on its own.
