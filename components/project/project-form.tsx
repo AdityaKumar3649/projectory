@@ -315,18 +315,18 @@ export function ProjectForm({
             control={form.control}
             name="tags"
             render={({ field }) => (
+              // The hint lives inside TagInput because the "Maximum 5 tags" state
+              // has to replace it, and it is the same live region.
               <TagInput
                 id="tags"
                 value={field.value ?? []}
                 onChange={field.onChange}
                 error={errors.tags?.message}
                 max={MAX_TAGS}
+                hint={`Up to ${LIMITS.maxTags} tags. Used to filter projects in Explore.`}
               />
             )}
           />
-          <p className="text-xs text-ink-3">
-            Up to {LIMITS.maxTags} tags. Used to filter projects in Explore.
-          </p>
         </FormSection>
 
         {/* No negative margins here: the form column is clamped to 720px, so

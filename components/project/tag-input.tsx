@@ -25,6 +25,7 @@ export function TagInput({
   error,
   max = MAX_TAGS,
   id,
+  hint,
 }: {
   value: string[];
   onChange: (tags: string[]) => void;
@@ -32,8 +33,11 @@ export function TagInput({
   max?: number;
   /** Wired to the enclosing `Field`'s `htmlFor`. */
   id?: string;
+  /** Guidance shown while there is room for more tags. */
+  hint?: string;
 }) {
   const generatedId = useId();
+  const hintId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
 
@@ -67,9 +71,8 @@ export function TagInput({
   const removeTag = (tag: string) => {
     onChange(value.filter((existing) => existing !== tag));
     // The chip that held focus is about to unmount, so move focus somewhere
-    // predictable instead of dropping it on <body>. The input is disabled while
-    // the list is full, and this runs before React re-renders, so guard on it.
-    if (inputRef.current && !inputRef.current.disabled) inputRef.current.focus();
+    // predictable instead of dropping it on <body>.
+    inputRef.current?.focus();
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -122,6 +125,13 @@ export function TagInput({
           </Chip>
         ))}
 
+        {/*
+          Not disabled when full. A disabled input is invisible to assistive
+          technology and drops out of the tab order, so once the fifth chip was
+          added the field silently stopped being reachable and the only way back
+          was to guess. It stays editable, and the handler declines to add
+          anything, so the ceiling is still enforced.
+        */}
         <input
           ref={inputRef}
           id={id ?? generatedId}
@@ -129,11 +139,11 @@ export function TagInput({
           onChange={handleInput}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          disabled={isFull}
-          placeholder={isFull ? "" : "Add tag"}
+          placeholder="Add tag"
           aria-label="Add a tag"
           aria-invalid={error ? true : undefined}
-          className="min-w-24 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3 focus-visible:outline-none disabled:cursor-not-allowed"
+          aria-describedby={hintId}
+          className="min-w-24 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3 focus-visible:outline-none"
         />
       </div>
 
@@ -141,11 +151,11 @@ export function TagInput({
         <p role="alert" className="text-xs text-rejected-fg">
           {error}
         </p>
-      ) : isFull ? (
-        <p aria-live="polite" className="text-xs text-ink-3">
-          Maximum {max} tags
+      ) : (
+        <p id={hintId} aria-live="polite" className="text-xs text-ink-3">
+          {isFull ? `Maximum ${max} tags. Remove one to add another.` : hint}
         </p>
-      ) : null}
+      )}
     </div>
   );
 }
