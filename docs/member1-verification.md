@@ -424,6 +424,157 @@ So a new member only needs `npm install && npm run dev`.
 | Heading order / labels / alt / lang | Correct on all three authenticated screens |
 | Console | 0 errors, 0 application warnings |
 
+## Second pass — seven further rounds
+
+A second sweep after the first ten rounds, run the same way: each round had a
+distinct focus, and every claim below was executed and observed. Five of the
+seven rounds found real defects. Two rounds (4 and 5) turned out to be entirely
+my own measurement bugs, and round 3 produced two false alarms alongside a real
+one — all recorded below rather than quietly discarded.
+
+| # | Focus | Found |
+| --- | --- | --- |
+| 1 | Data store concurrency | **Reads bypassed the write queue, so a read landing mid-write tore the file and wiped the database** |
+| 2 | Validation boundaries, double submit, error association | Dead email normalisation; four unassociated form errors |
+| 3 | Navigation, sorting, filtering, empty states | No skip link anywhere |
+| 4 | Contrast, both themes, 16 states | Clean (first run was my own measurement bug) |
+| 5 | Dialogs, optimistic UI, races | Clean (first run was my own measurement bug) |
+| 6 | Concurrency, injection, touch targets | Two controls under the 24px minimum |
+| 7 | Full journey over the public tunnel | **Every form leaked its contents into the URL before hydration** |
+
+### Round 1 — the store was destroying data on every write
+
+The production log showed this fifteen times in a row:
+
+    [projectory] Local store was unreadable and has been re-seeded.
+
+Each one replaced the user's data with the demo seed. Two bugs compounded:
+
+- `getMyProjects`, `getProfile` and the session lookup all called `readDb()`
+  outside the write queue, so a page load could interleave with a Server Action.
+- `fs.writeFile` truncates the target before writing, so for a window the file
+  is half a document and a read landing there fails `JSON.parse`.
+
+Fixed with an atomic write (temp file, then `rename`, which is atomic within a
+directory), a last-known-good snapshot as the parse-failure fallback instead of
+re-seeding, and routing every read through the same queue as writes.
+
+Verified with 40 concurrent writes and 200 concurrent reads fired together:
+
+    start projects   : 6
+    after 40 writes  : 46 (expected 46)
+    races on disk    : 40/40
+    failed reads     : 0
+    re-seed events   : 0
+    RESULT: NO DATA LOSS, NO RE-SEED
+
+### Round 2 — validation, double submit, error association
+
+69 boundary cases at the schema level: min-1 / min / max / max+1 on every
+bounded field, the tag character rules, and URL schemes. 68 passed. The failure
+was real:
+
+`z.email().trim().toLowerCase()` does not do what it looks like. In Zod 4
+`z.email()` is a format check that runs first, so the trim and lowercase only
+ever see input that already passed. An address pasted with a trailing space was
+rejected as "Enter a valid email address". Now normalised, then validated.
+
+Every form error was also announced but never associated with its control:
+`Field` rendered `role="alert"` with no id and no `aria-describedby`. The
+obvious fix — `cloneElement` the child — silently does nothing when the child is
+a react-hook-form `<Controller>`, because the prop lands on `Controller` and is
+dropped. Replaced with a small context, which travels through `Controller`
+correctly. `TagInput` had the mirror-image bug: its `aria-describedby` pointed at
+an element that stopped existing precisely when an error needed it.
+
+Audited every `aria-describedby` in all eight form states: 0 dangling references,
+0 empty alerts, every error resolving to its control.
+
+Confirmed correct and left alone: a `dblclick` on Create produces exactly one
+project; focus moves to the first invalid field; Enter submits.
+
+### Round 3 — navigation and sorting
+
+The first probe reported that "Recently updated" and "Newest first" returned an
+identical order, which looked like the created sort falling through. It was the
+probe: nothing had been edited, so the two genuinely coincide. Redone properly —
+editing the oldest project moved it to the top of "Recently updated" while
+leaving it last under "Newest first".
+
+Four elements flagged as overflowing by up to 981px were all deliberate
+clipping (`truncate`, `sr-only`). Document overflow: 0px on all seven routes.
+
+Added the missing skip link. It uses `focus:not-sr-only`, because `sr-only`
+also clips on focus and the link would stay invisible at the moment it is
+needed, and `<main>` gets `tabIndex={-1}`, because a fragment link scrolls but
+does not move focus, so the next Tab would resume inside the header the link
+exists to bypass. Verified on all six routes.
+
+### Rounds 4 and 5 — clean, after fixing the audits
+
+Round 4 first reported dozens of contrast failures. All of them were my colour
+parser mishandling `oklab()` and ignoring alpha, which inverted every ratio.
+Re-measured correctly: **0 failures across 16 states** — both themes over seven
+routes plus an errored form and the delete dialog. No token was changed.
+
+Round 5 first reported the delete dialog leaking focus. Playwright reports
+`activeElement === body` at the tab wrap-around boundary, which was being
+counted as an escape. Measured properly: all 20 background interactive elements
+are inert, and Tab and Shift+Tab only ever land on the two dialog buttons.
+
+### Round 6 — concurrency, injection, touch targets
+
+Three tabs saving the profile simultaneously settle on exactly one of the three
+writes, and that value is stable across a reload — persisted, not echoed. That
+is the round 1 queue doing its job.
+
+A canary payload combining `<img onerror>`, `<script>`, `<svg onload>` and
+attribute-breakout text was stored on three surfaces and re-read. No canary
+global fired, no injected element exists, no node carries an event handler, and
+every payload survived intact as data. Earlier "leaks" were a regex matching
+escaped text in `innerHTML`, which is the point.
+
+Two real touch-target defects: the back-links on the project and profile forms
+were 20px tall, and the tag input was a 20px strip inside a 40px field. Both
+now clear 24px with no change to the surrounding vertical rhythm.
+
+### Round 7 — every form leaked into the URL
+
+Running the whole journey through the public tunnel rather than localhost
+surfaced this immediately: the project form submitted to
+
+    /dashboard/new?title=...&description=...&longDescription=...&repoUrl=...
+
+A `<form>` with no `action` and no `method` defaults to GET on the current URL.
+All four forms were affected. On the auth forms a pre-hydration submit produced
+
+    /sign-in?email=...&password=...
+
+which put the password into the address bar, the browser history, and every
+proxy and access log in between.
+
+Each form now carries its Server Action as its action. React substitutes a
+throwing placeholder for a function action — a Server Action is a closure, not
+a postable endpoint — so the pre-hydration path fails visibly and harmlessly
+instead of publishing credentials. Genuine no-JS support would mean a Route
+Handler per form, which is larger than the bug warrants.
+
+Verified with JavaScript disabled: the sign-in URL stays `/sign-in`, no password,
+no email. And no double submit on the hydrated path.
+
+### Two audits that were wrong, and one that was mine
+
+Recorded because "the probe disagreed with the app" is worth resolving explicitly
+rather than by adjusting whichever is inconvenient:
+
+| Apparent bug | Reality |
+| --- | --- |
+| `created` and `updated` sorts identical | Correct — nothing had been edited |
+| Delete dialog leaks focus | Correct — the probe counted `body` as an escape |
+| 40 contrast failures | My parser mis-decoded `oklab()` and alpha |
+| 981px element overflow | Deliberate `truncate` / `sr-only` clipping |
+| Email rejected when pasted with a space | **Real** — Zod 4 ordering bug |
+
 ## Not verified, and why
 
 - **Real PostgreSQL / Drizzle.** Member 3 owns it. `lib/data/*` is the seam; the
