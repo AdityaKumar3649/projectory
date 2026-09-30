@@ -90,7 +90,7 @@ function StatusFilterInner({ active, counts }: { active: StatusKey; counts: Proj
             }}
             className={cn(
               "h-[30px] rounded-pill px-3 text-[13px] transition-colors sm:px-3.5",
-              current ? "bg-ink font-medium text-white" : "text-ink-2 hover:text-ink",
+              current ? "bg-ink font-medium text-on-ink" : "text-ink-2 hover:text-ink",
             )}
           >
             {label}

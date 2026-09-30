@@ -2,51 +2,174 @@
 
 /* ---------------------------------------------------------------------------
    Projectory design tokens.
-   These are the exact values used in the Pencil design system
-   (frame "Projectory — Design System"). If you change one here, change it
-   there too — the design file is the spec, this file is the implementation.
-   Tailwind v4 is CSS-first: every --color-* / --radius-* / --font-* below
-   automatically becomes a utility class (bg-surface, rounded-card, ...).
+
+   These are the exact values in the pen.dev design system (frame
+   "Projectory — Design System"). The canvas is the spec; this file is the
+   implementation. Change one, change the other.
+
+   Tailwind v4 is CSS-first: every --color-* / --radius-* / --font-* declared in
+   @theme becomes a utility class (bg-surface, rounded-card, ...). Theming with
+   `data-theme` works because @theme inline emits var() references rather than
+   baked-in literals, so overriding the raw values under a selector re-themes
+   every utility at once.
+
+   Dark mode is native: it follows prefers-color-scheme by default, and the
+   header control can pin it to light or dark by setting data-theme on <html>.
 --------------------------------------------------------------------------- */
-@theme {
+
+:root {
+  color-scheme: light;
+
   /* Surfaces */
-  --color-base: #fcfcfd;
-  --color-surface: #ffffff;
-  --color-sunken: #f4f4f6;
+  --pj-base: #fcfcfd;
+  --pj-surface: #ffffff;
+  --pj-sunken: #f4f4f6;
 
   /* Lines */
-  --color-hairline: #e9e9ec;
-  --color-line: #d9d9e0;
+  --pj-hairline: #e9e9ec;
+  --pj-line: #d9d9e0;
 
   /* Ink */
-  --color-ink: #0c0c0f;
-  --color-ink-2: #3a3a42;
-  --color-ink-3: #8a8a93;
+  --pj-ink: #0c0c0f;
+  --pj-ink-2: #3a3a42;
+  --pj-ink-3: #8a8a93;
+  --pj-on-ink: #ffffff;
 
   /* The single accent */
-  --color-accent: #1f4bff;
-  --color-accent-hover: #1740d6;
-  --color-accent-soft: #eef2ff;
+  --pj-accent: #1f4bff;
+  --pj-accent-hover: #1740d6;
+  --pj-accent-soft: #eef2ff;
 
-  /* Status — the only three colours allowed to be loud */
-  --color-pending: #fdf4e3;
-  --color-pending-fg: #92400e;
-  --color-approved: #e7f6ee;
-  --color-approved-fg: #0f7b4f;
-  --color-rejected: #fdecea;
-  --color-rejected-fg: #b42318;
+  /* Status — the only three allowed to be loud */
+  --pj-pending: #fdf4e3;
+  --pj-pending-fg: #92400e;
+  --pj-approved: #e7f6ee;
+  --pj-approved-fg: #0f7b4f;
+  --pj-rejected: #fdecea;
+  --pj-rejected-fg: #b42318;
 
-  /* Radii */
+  /* Status dots keep the same hue but gain luminance for dark surfaces */
+  --pj-dot-pending: #b45309;
+  --pj-dot-approved: #0f7b4f;
+  --pj-dot-rejected: #b42318;
+}
+
+/* ---- Dark ----------------------------------------------------------------
+   Not a filter: a real palette. Surfaces lift as they come forward
+   (base -> sunken -> surface), borders gain contrast so they stay visible
+   against dark fills, and body ink inverts. The accent is lightened because
+   #1f4bff is unreadable on a near-black background. Status pairs swap to
+   dark-surface tints with brighter foregrounds.
+   data-theme="dark" is the explicit override; the media query is the default.
+------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --pj-base: #0b0b0e;
+    --pj-surface: #141418;
+    --pj-sunken: #1c1c22;
+
+    --pj-hairline: #26262e;
+    --pj-line: #383842;
+
+    --pj-ink: #f4f4f6;
+    --pj-ink-2: #b4b4bf;
+    --pj-ink-3: #85858f;
+    --pj-on-ink: #0b0b0e;
+
+    --pj-accent: #7d97ff;
+    --pj-accent-hover: #9db0ff;
+    --pj-accent-soft: #171f3d;
+
+    --pj-pending: #2a1f0d;
+    --pj-pending-fg: #f0c674;
+    --pj-approved: #0d2419;
+    --pj-approved-fg: #6ee7a8;
+    --pj-rejected: #2c1412;
+    --pj-rejected-fg: #f8a49b;
+
+    --pj-dot-pending: #f0c674;
+    --pj-dot-approved: #6ee7a8;
+    --pj-dot-rejected: #f8a49b;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --pj-base: #0b0b0e;
+  --pj-surface: #141418;
+  --pj-sunken: #1c1c22;
+
+  --pj-hairline: #26262e;
+  --pj-line: #383842;
+
+  --pj-ink: #f4f4f6;
+  --pj-ink-2: #b4b4bf;
+  --pj-ink-3: #85858f;
+  --pj-on-ink: #0b0b0e;
+
+  --pj-accent: #7d97ff;
+  --pj-accent-hover: #9db0ff;
+  --pj-accent-soft: #171f3d;
+
+  --pj-pending: #2a1f0d;
+  --pj-pending-fg: #f0c674;
+  --pj-approved: #0d2419;
+  --pj-approved-fg: #6ee7a8;
+  --pj-rejected: #2c1412;
+  --pj-rejected-fg: #f8a49b;
+
+  --pj-dot-pending: #f0c674;
+  --pj-dot-approved: #6ee7a8;
+  --pj-dot-rejected: #f8a49b;
+}
+
+@theme inline {
+  --color-base: var(--pj-base);
+  --color-surface: var(--pj-surface);
+  --color-sunken: var(--pj-sunken);
+
+  --color-hairline: var(--pj-hairline);
+  --color-line: var(--pj-line);
+
+  --color-ink: var(--pj-ink);
+  --color-ink-2: var(--pj-ink-2);
+  --color-ink-3: var(--pj-ink-3);
+  --color-on-ink: var(--pj-on-ink);
+
+  --color-accent: var(--pj-accent);
+  --color-accent-hover: var(--pj-accent-hover);
+  --color-accent-soft: var(--pj-accent-soft);
+
+  --color-pending: var(--pj-pending);
+  --color-pending-fg: var(--pj-pending-fg);
+  --color-approved: var(--pj-approved);
+  --color-approved-fg: var(--pj-approved-fg);
+  --color-rejected: var(--pj-rejected);
+  --color-rejected-fg: var(--pj-rejected-fg);
+
+  --color-dot-pending: var(--pj-dot-pending);
+  --color-dot-approved: var(--pj-dot-approved);
+  --color-dot-rejected: var(--pj-dot-rejected);
+
   --radius-pill: 999px;
   --radius-input: 10px;
   --radius-card: 12px;
 
-  /* Type */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
 
   /* One shadow, popovers only. Cards use borders, never shadows. */
   --shadow-pop: 0 4px 12px rgb(12 12 15 / 0.08);
+}
+
+/* In dark mode a shadow on a dark surface reads as nothing, so elevation comes
+   from a border and a lighter fill instead. */
+:root[data-theme="dark"] .shadow-pop,
+:root:not([data-theme="light"]) .shadow-pop {
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.5);
 }
 
 @layer base {
@@ -66,23 +189,30 @@
     color: var(--color-accent);
   }
 
-  /* One consistent focus ring instead of per-component outlines. */
   :focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 
-  /* Chrome renders number inputs with spinners we never want in a form. */
   input[type="number"]::-webkit-outer-spin-button,
   input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
   }
+
+  /* The native <dialog> scrim. Tailwind's backdrop: variant cannot reach this
+     pseudo-element, so it is set here and tinted per theme. */
+  dialog::backdrop {
+    background-color: rgb(12 12 15 / 0.4);
+  }
+  :root[data-theme="dark"] dialog::backdrop,
+  :root:not([data-theme="light"]) dialog::backdrop {
+    background-color: rgb(0 0 0 / 0.6);
+  }
 }
 
 @layer utilities {
-  /* Applied by the (app) layout to keep the sticky footer from covering the
-     last row of a long form. */
+  /* Keeps the sticky form footer from covering the last field on short screens. */
   .pb-safe {
     padding-bottom: 5rem;
   }

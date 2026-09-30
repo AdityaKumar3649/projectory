@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { getCurrentUser } from "@/lib/auth";
 
 /**
@@ -29,8 +30,13 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
 
   return (
     <div className="relative flex min-h-dvh bg-base">
-      <main className="flex w-full flex-col justify-between bg-surface px-12 py-12 lg:w-[56%]">
-        <Wordmark />
+      <main className="flex w-full flex-col justify-between bg-surface px-6 py-8 sm:px-12 sm:py-12 lg:w-[56%]">
+        <div className="flex items-center justify-between gap-4">
+          <Wordmark />
+          {/* Present here too: someone who lands on /sign-in in dark mode should
+              not have to sign in before they can get to a readable page. */}
+          <ThemeToggle />
+        </div>
         {children}
       </main>
     </div>
@@ -41,7 +47,7 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
 function Wordmark() {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="flex size-7 items-center justify-center rounded-pill bg-ink text-sm font-semibold text-white">
+      <span className="flex size-7 items-center justify-center rounded-pill bg-ink text-sm font-semibold text-on-ink">
         P
       </span>
       <span className="text-[17px] font-semibold text-ink">Projectory</span>

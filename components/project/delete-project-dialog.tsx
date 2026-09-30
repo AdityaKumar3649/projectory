@@ -64,7 +64,7 @@ export function DeleteProjectDialog({
         // The UA stylesheet centres modal dialogs, so `m-auto` keeps that
         // behaviour explicit. The width is capped by `max-w-md` on desktop and
         // by the viewport minus a gutter on a phone.
-        className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-card border border-hairline bg-surface p-0 text-ink shadow-pop backdrop:bg-ink/40 open:block"
+        className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-card border border-hairline bg-surface p-0 text-ink shadow-pop open:block"
       >
         <div className="flex flex-col gap-4 p-5">
           <div className="flex flex-col gap-1.5">

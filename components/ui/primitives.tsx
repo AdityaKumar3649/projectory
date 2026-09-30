@@ -7,11 +7,15 @@ import { cn, initials } from "@/lib/utils";
 /**
  * Status badge. The ONLY place colour is allowed to carry meaning, and it
  * always means the same thing: where the project is in the moderation queue.
+ *
+ * The dot is a solid fill rather than `bg-current opacity-70`: at 70% over a
+ * dark tint in dark mode it lost contrast and the dot stopped reading as a
+ * distinct state marker. Dedicated dot tokens keep it legible in both themes.
  */
-const STATUS_STYLES: Record<ProjectStatus, { label: string; className: string }> = {
-  pending: { label: "Pending", className: "bg-pending text-pending-fg" },
-  approved: { label: "Approved", className: "bg-approved text-approved-fg" },
-  rejected: { label: "Rejected", className: "bg-rejected text-rejected-fg" },
+const STATUS_STYLES: Record<ProjectStatus, { label: string; className: string; dot: string }> = {
+  pending: { label: "Pending", className: "bg-pending text-pending-fg", dot: "bg-dot-pending" },
+  approved: { label: "Approved", className: "bg-approved text-approved-fg", dot: "bg-dot-approved" },
+  rejected: { label: "Rejected", className: "bg-rejected text-rejected-fg", dot: "bg-dot-rejected" },
 };
 
 export function StatusBadge({
@@ -30,7 +34,7 @@ export function StatusBadge({
         style.className,
       )}
     >
-      <span className="size-1.5 rounded-full bg-current opacity-70" />
+      <span className={cn("size-1.5 rounded-full", style.dot)} />
       {style.label}
     </span>
   );

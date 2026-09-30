@@ -7,6 +7,7 @@ import { LogOut } from "lucide-react";
 import { signOutAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, Chip } from "@/components/ui/primitives";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import type { AuthUser } from "@/lib/contracts/types";
 import { cn } from "@/lib/utils";
 
@@ -53,7 +54,7 @@ export function AppNav({ user, active: forced }: { user: AuthUser; active?: NavK
     <header className="sticky top-0 z-40 border-b border-hairline bg-surface/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[1120px] items-center gap-3 px-4 sm:gap-7 sm:px-6">
         <Link href="/dashboard" className="flex shrink-0 items-center gap-2.5">
-          <span className="inline-flex size-7 items-center justify-center rounded-pill bg-ink text-sm font-semibold text-white">
+          <span className="inline-flex size-7 items-center justify-center rounded-pill bg-ink text-sm font-semibold text-on-ink">
             P
           </span>
           <span className="hidden text-[17px] font-semibold tracking-[-0.01em] sm:inline">
@@ -91,6 +92,7 @@ export function AppNav({ user, active: forced }: { user: AuthUser; active?: NavK
           {user.isDemo ? (
             <Chip className="hidden h-5 px-2 text-[11px] sm:inline-flex">Demo</Chip>
           ) : null}
+          <ThemeToggle />
           <Avatar
             name={user.name}
             src={user.avatarUrl || undefined}
