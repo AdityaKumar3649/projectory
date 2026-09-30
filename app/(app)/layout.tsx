@@ -21,7 +21,20 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh bg-base">
       <AppNav user={user} />
-      <main className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16 sm:px-6">{children}</main>
+      {/*
+      `tabIndex={-1}` because the skip link targets this element. A fragment link
+      scrolls to it, but without a tab stop the browser does not move focus
+      there, so the next Tab would resume inside the header the link was meant to
+      bypass. The negative tabIndex takes it out of the natural tab order while
+      still letting it receive programmatic focus.
+    */}
+    <main
+      id="main"
+      tabIndex={-1}
+      className="mx-auto w-full max-w-[1120px] px-4 pt-8 pb-16 sm:px-6 focus:outline-none"
+    >
+      {children}
+    </main>
     </div>
   );
 }

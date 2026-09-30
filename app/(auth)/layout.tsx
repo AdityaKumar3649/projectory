@@ -30,7 +30,11 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
 
   return (
     <div className="relative flex min-h-dvh bg-base">
-      <main className="flex w-full flex-col justify-between bg-surface px-6 py-8 sm:px-12 sm:py-12 lg:w-[56%]">
+      <main
+        id="main"
+        tabIndex={-1}
+        className="flex w-full flex-col justify-between bg-surface px-6 py-8 focus:outline-none sm:px-12 sm:py-12 lg:w-[56%]"
+      >
         <div className="flex items-center justify-between gap-4">
           <Wordmark />
           {/* Present here too: someone who lands on /sign-in in dark mode should
