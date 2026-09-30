@@ -76,6 +76,38 @@ export function ProjectForm({
   const titleValue = useWatch({ control: form.control, name: "title" });
   const descriptionValue = useWatch({ control: form.control, name: "description" });
 
+  /*
+   * The Server Action is attached to the form as its `action`.
+   *
+   * This was a live bug, caught over the public tunnel: a submit arriving
+   * before hydration fell back to the browser's native handling, and a `<form>`
+   * with no `action` and no `method` defaults to GET on the current URL. The
+   * result was a navigation to
+   *
+   *   /dashboard/new?title=...&description=...&longDescription=...
+   *
+   * which published the user's entire draft in the address bar, the browser
+   * history and every proxy and access log in between, and left them on a page
+   * that looked broken.
+   *
+   * React substitutes a throwing placeholder for a function action, because a
+   * Server Action is a closure and cannot be posted to as a plain endpoint. So
+   * the pre-hydration path now fails visibly and harmlessly instead of leaking
+   * the draft. Real no-JS support would mean a Route Handler to post to.
+   *
+   * The wrapper exists because these actions take `(prevState, formData)` for
+   * `useActionState`, while a form action is handed the form data alone. React
+   * runs `onSubmit` before the action and react-hook-form prevents the default,
+   * so the hydrated path still goes through the transition below exactly once.
+   */
+  const serverAction = project
+    ? async (formData: FormData) => {
+        await updateProjectAction(null, formData);
+      }
+    : async (formData: FormData) => {
+        await createProjectAction(null, formData);
+      };
+
   const onSubmit = form.handleSubmit((values) => {
     startTransition(async () => {
       const fd = new FormData();
@@ -170,7 +202,13 @@ export function ProjectForm({
         ) : null}
       </div>
 
-      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
+      <form action={serverAction} onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
+      {/*
+        The update action reads `projectId` from the form data. The hydrated
+        path sets it explicitly on the FormData it builds, but rendering it as a
+        real field keeps the action's contract satisfied from the markup alone.
+      */}
+      {project ? <input type="hidden" name="projectId" value={project.id} /> : null}
         {formError ? <Alert tone="error">{formError}</Alert> : null}
 
         <FormSection label="Details">

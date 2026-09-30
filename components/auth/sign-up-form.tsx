@@ -14,6 +14,11 @@ import {
   type SignUpValues as Values,
 } from "@/lib/auth/schemas";
 
+/** See the note on `submitSignIn` in sign-in-form.tsx for why this wrapper exists. */
+async function submitSignUp(formData: FormData): Promise<void> {
+  await signUpAction(null, formData);
+}
+
 export function SignUpForm({ next }: { next?: string }) {
   const [state, setState] = useState<AuthFormState>(null);
   const [pending, startTransition] = useTransition();
@@ -62,7 +67,24 @@ export function SignUpForm({ next }: { next?: string }) {
   return (
     // `onInput` drops the server banner as soon as the user starts fixing
     // things, instead of leaving a stale failure above live input.
-    <form onSubmit={onSubmit} onInput={() => setState(null)} noValidate className="flex flex-col gap-5">
+    <form
+      action={submitSignUp}
+      onSubmit={onSubmit}
+      onInput={() => setState(null)}
+      noValidate
+      className="flex flex-col gap-5"
+    >
+      {/*
+        Same reason as the sign-in form, and the same fix: without an `action` a
+        pre-hydration submit defaults to GET and publishes the password in the
+        URL. React's throwing placeholder makes that path fail harmlessly
+        instead. See the longer note in sign-in-form.tsx.
+
+        `terms` needs no hidden field - it is a named checkbox, and the action
+        rejects anything that is neither "on" nor "true", so consent still
+        cannot be skipped.
+      */}
+      <input type="hidden" name="next" value={next ?? ""} />
       {showAlert ? <Alert tone="error">{state?.error}</Alert> : null}
 
       <Field label="Full name" htmlFor="sign-up-name" error={nameError}>

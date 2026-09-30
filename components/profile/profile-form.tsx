@@ -78,6 +78,11 @@ const defaultsOf = (profile: UserProfile): ProfileFormValues => ({
   avatarUrl: profile.avatarUrl,
 });
 
+/** See the note on `submitSignIn` in sign-in-form.tsx for why this wrapper exists. */
+async function submitProfile(formData: FormData): Promise<void> {
+  await updateProfileAction(null, formData);
+}
+
 export function ProfileForm({ profile }: { profile: UserProfile }) {
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileInputSchema),
@@ -102,6 +107,17 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
   const avatarUrl = useWatch({ control: form.control, name: "avatarUrl" });
   const { errors } = form.formState;
 
+  /*
+   * The form carries the Server Action as its `action`. With no `action`, a
+   * submit arriving before hydration falls back to the browser's default GET on
+   * the current URL, which publishes the whole profile draft - bio and every
+   * link - into the address bar, the history and the logs. React replaces a
+   * function action with a throwing placeholder, so that path now fails
+   * visibly and harmlessly instead. See the note in sign-in-form.tsx.
+   *
+   * React runs `onSubmit` first and react-hook-form prevents the default, so
+   * the hydrated path is unchanged and still runs exactly once.
+   */
   const onSubmit = form.handleSubmit((values) => {
     setState(null);
     // Zod trims, so `values` is exactly what the server will persist.
@@ -149,7 +165,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
         </p>
       </div>
 
-      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
+      <form action={submitProfile} onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
         <div className="flex items-center gap-4">
           <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-pill border border-hairline bg-accent-soft">
             {avatarUrl ? (

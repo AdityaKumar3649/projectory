@@ -10,6 +10,17 @@ import { Field, Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/primitives";
 import { signInSchema, type SignInValues as Values } from "@/lib/auth/schemas";
 
+/*
+ * Wraps the Server Action into the `(formData) => void` shape a `<form action>`
+ * expects. The action itself takes `(prevState, formData)` because it is written
+ * for `useActionState`; a form action is handed the form data as its only
+ * argument, so the two shapes have to be bridged rather than passed straight
+ * through.
+ */
+async function submitSignIn(formData: FormData): Promise<void> {
+  await signInAction(null, formData);
+}
+
 export function SignInForm({ next }: { next?: string }) {
   const [state, setState] = useState<AuthFormState>(null);
   const [pending, startTransition] = useTransition();
@@ -51,7 +62,29 @@ export function SignInForm({ next }: { next?: string }) {
   return (
     // `onInput` drops the server banner as soon as the user starts fixing
     // things, instead of leaving a stale failure above live input.
-    <form onSubmit={onSubmit} onInput={() => setState(null)} noValidate className="flex flex-col gap-5">
+    //
+    // The `action` is what stops a pre-hydration submit from becoming a GET.
+    // This was a real leak, caught over the public tunnel: with no `action`,
+    // the browser's default is GET on the current URL, so submitting before
+    // hydration navigated to
+    //
+    //   /sign-in?email=...&password=...
+    //
+    // which put the password in the address bar, the browser history and every
+    // proxy and access log in between. Here React substitutes a throwing
+    // placeholder instead, because a Server Action is a closure and cannot be
+    // posted to directly - so the no-JS path fails visibly and harmlessly
+    // rather than publishing the credential. Genuine no-JS support would need a
+    // Route Handler that the form posts to as a plain endpoint.
+    <form
+      action={submitSignIn}
+      onSubmit={onSubmit}
+      onInput={() => setState(null)}
+      noValidate
+      className="flex flex-col gap-5"
+    >
+      {/* The action reads `next` from the form data; `remember` is a named checkbox. */}
+      <input type="hidden" name="next" value={next ?? ""} />
       {showAlert ? <Alert tone="error">{state?.error}</Alert> : null}
 
       <Field label="Email address" htmlFor="sign-in-email" error={emailError}>
