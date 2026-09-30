@@ -201,11 +201,52 @@ async function ensureDb(): Promise<void> {
   }
 }
 
+/**
+ * Reads the store, and re-seeds it if the file is missing or unreadable.
+ *
+ * The corruption case matters: a truncated write, a stray editor, or a manual
+ * edit leaves invalid JSON, and a bare `JSON.parse` throws on every subsequent
+ * request. Because the file is the database, that turns one bad byte into a
+ * permanently broken app with no way back in through the UI. Re-seeding instead
+ * means a bad file costs the demo data and nothing else.
+ *
+ * A structurally wrong but parseable file is caught too — a half-written object
+ * missing `projects` would otherwise fail deep inside a query with a confusing
+ * message rather than here.
+ */
 export async function readDb(): Promise<DbShape> {
   await ensureDb();
   const fs = await import("node:fs/promises");
-  const raw = await fs.readFile(DB_FILE, "utf8");
-  return JSON.parse(raw) as DbShape;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await fs.readFile(DB_FILE, "utf8"));
+  } catch {
+    await reseed();
+    return seed();
+  }
+
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    !Array.isArray((parsed as DbShape).projects) ||
+    !Array.isArray((parsed as DbShape).accounts)
+  ) {
+    await reseed();
+    return seed();
+  }
+
+  return parsed as DbShape;
+}
+
+async function reseed() {
+  const fs = await import("node:fs/promises");
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(DB_FILE, JSON.stringify(seed(), null, 2), "utf8");
+  console.warn(
+    "[projectory] Local store was unreadable and has been re-seeded. " +
+      "Delete .data/db.json to reset at any time.",
+  );
 }
 
 /**
