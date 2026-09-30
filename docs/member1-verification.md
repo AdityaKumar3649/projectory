@@ -28,6 +28,12 @@ my own UI kit: `Button` defaults to `type="button"`, so the nav's
 recording why. The other five submit buttons in the codebase were already
 correct — this was the only occurrence.
 
+**Edit-form prefill.** A cold load of `/dashboard/[id]/edit` painted empty
+inputs that filled in on hydration, because react-hook-form's `defaultValues`
+never reach the server-rendered HTML. Fixed by passing `defaultValue`
+alongside `register()` on the affected fields. Verified by fetching the raw HTML
+and confirming `value="Orbit Sync"` is present before any JavaScript runs.
+
 ### 2. Protected routes correctly block unauthenticated access
 
 | Check | Result |
@@ -35,6 +41,8 @@ correct — this was the only occurrence.
 | Guest → `/dashboard` | 307 to `/sign-in?next=%2Fdashboard` |
 | Guest → `/settings` | Redirected to sign-in |
 | Destination preserved | `?next=` round-trips back to the original route after sign-in |
+| Signed-in visitor → `/sign-in` or `/sign-up` | Bounced to `/dashboard` |
+| Stale cookie (session deleted server-side) | Renders the sign-in form — no loop |
 
 Enforced twice on purpose: `proxy.ts` gives a clean redirect (cookie presence
 only — it never touches the database, because it runs on every request including
@@ -42,6 +50,22 @@ prefetches), and `requireUser()` in `lib/auth/index.ts` is the authoritative
 check that every protected page calls. The check lives in the data-access layer
 rather than in a layout because a layout does not re-render on navigation and so
 cannot be trusted to guard a route alone.
+
+**Serious bug found and fixed during this test — an infinite redirect loop.**
+The first version of `proxy.ts` also redirected an *authenticated* visitor away
+from `/sign-in`, and that deadlocked with `requireUser()`:
+
+```
+stale cookie → /dashboard passes proxy → requireUser() → /sign-in
+             → proxy sees the cookie → /dashboard → requireUser() → …
+```
+
+Observed as `ERR_TOO_MANY_REDIRECTS`. This would have hit any real user whose
+session expired or was revoked while the cookie was still in their browser — not
+an edge case. The cause is that cookie *presence* cannot distinguish a valid
+session from a stale one, so the two checks could disagree. The bounce now lives
+in `app/(auth)/layout.tsx`, which resolves the session properly. Both behaviours
+were re-verified afterwards.
 
 ### 3. A user can create, edit and delete their own project
 
@@ -153,6 +177,29 @@ column and the buttons align with the field edges.
 
 ---
 
+## Cold start
+
+Simulated a fresh clone by deleting `.data/` entirely while the dev server kept
+running, with a stale cookie still in the browser:
+
+| Check | Result |
+| --- | --- |
+| Store auto-created and seeded | 6 projects across all three states |
+| Stale cookie on `/sign-in` | Sign-in form renders (no loop) |
+| Demo sign-in against the fresh store | Lands on the dashboard, tiles read 6 / 2 / 3 / 1 |
+
+So a new member only needs `npm install && npm run dev`.
+
+## Accessibility and semantics
+
+| Check | Result |
+| --- | --- |
+| Project row is a single link | 1 anchor per row, hit-testing over the title, description, tags and badge all resolve to that anchor |
+| Nested interactive elements | 0 buttons inside the row anchor (previously 1 — invalid HTML) |
+| Invalid inputs | `aria-invalid` set, messages in `role="alert"` |
+| Delete confirmation | Native `<dialog>` via `showModal()`, so focus trapping, Esc and background inertness come from the platform |
+| Console | 0 errors, 0 application warnings |
+
 ## Not verified, and why
 
 - **Real PostgreSQL / Drizzle.** Member 3 owns it. `lib/data/*` is the seam; the
@@ -166,12 +213,17 @@ column and the buttons align with the field edges.
   browser. The read path is proven blocked above, and the write path re-checks
   ownership inside `withDb`, but the write has not been exercised end to end
   against a live server action.
+- **Screen-reader pass.** Semantics were checked structurally in the DOM, not
+  with an actual assistive technology.
 
-## Known minor issue
+## Design / code parity
 
-On a cold load of the edit page, react-hook-form's controlled inputs render empty
-in the server HTML and populate on hydration, so a prefill can flash briefly.
-The values are correct and no data is at risk; the clean fix is to pass
-`defaultValue` through to the DOM alongside `register()`, deferred because it
-touches working form code and the flash lasts well under a second on a
-dynamically rendered route.
+The Organisation field is free text in both the code and the Pencil design
+(frames `cvkux` and `tZNGA`). It was originally a `<select>` containing three
+invented company names, which would have presented fabricated data as real. When
+Member 3's Organisations table lands, swap it for a populated select and change
+`organizationId` to hold an id.
+
+The design also drops the GitHub brand glyph from the "Continue with GitHub"
+button, because `lucide-react` v1 removed all brand icons and the shipped button
+is plain text.

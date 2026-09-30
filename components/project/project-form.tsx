@@ -14,7 +14,7 @@ import {
 import { FormSection } from "@/components/project/form-section";
 import { TagInput } from "@/components/project/tag-input";
 import { Button, buttonClass } from "@/components/ui/button";
-import { Field, Input, Select, Textarea } from "@/components/ui/input";
+import { Field, Input, Textarea } from "@/components/ui/input";
 import { Alert, StatusBadge } from "@/components/ui/primitives";
 import type { Project } from "@/lib/contracts/types";
 import { relativeTime } from "@/lib/utils";
@@ -39,8 +39,6 @@ const KNOWN_FIELDS = [
   "tags",
   "organizationId",
 ] as const;
-
-const ORGANISATIONS = ["Acme Labs", "Northwind", "Personal"] as const;
 
 /**
  * Create and edit share this form because they share a schema and a Server
@@ -184,6 +182,10 @@ export function ProjectForm({
               autoComplete="off"
               placeholder="Terminal Focus — a terminal that stays out of the way"
               invalid={!!errors.title}
+              // Mirrors the react-hook-form default so the value is present in
+              // the server-rendered HTML. Without it the edit form paints empty
+              // and only fills in on hydration, which reads as a flash.
+              defaultValue={project?.title ?? ""}
               {...form.register("title")}
             />
           </Field>
@@ -205,6 +207,7 @@ export function ProjectForm({
               className="min-h-18"
               placeholder="A focused terminal that stays out of the way."
               invalid={!!errors.description}
+              defaultValue={project?.description ?? ""}
               {...form.register("description")}
             />
           </Field>
@@ -221,6 +224,7 @@ export function ProjectForm({
               className="min-h-40"
               placeholder="What it does, how it works, and what you learned building it."
               invalid={!!errors.longDescription}
+              defaultValue={project?.longDescription ?? ""}
               {...form.register("longDescription")}
             />
           </Field>
@@ -283,20 +287,26 @@ export function ProjectForm({
         </FormSection>
 
         <FormSection label="Organisation (optional)">
+          {/*
+            Free text rather than a <select>. There is no Organisations table yet —
+            Member 3 owns that entity — and a dropdown of invented company names
+            would present fake data as if it were real. When the table lands,
+            swap this Input for a Select populated from a real query, and change
+            `organizationId` to hold an id rather than a display name.
+          */}
           <Field
             label="Organisation"
             htmlFor="organizationId"
-            hint="Only if this project belongs to a team or company."
+            hint="Leave blank if this is a solo project."
             error={errors.organizationId?.message}
           >
-            <Select id="organizationId" {...form.register("organizationId")}>
-              <option value="">— None —</option>
-              {ORGANISATIONS.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </Select>
+            <Input
+              id="organizationId"
+              placeholder="e.g. Acme Labs"
+              autoComplete="organization"
+              defaultValue={project?.organizationId ?? ""}
+              {...form.register("organizationId")}
+            />
           </Field>
         </FormSection>
 

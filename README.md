@@ -68,7 +68,8 @@ go through Server Actions in `app/actions/`, which resolve the owner from the
 
 Behind `lib/data/` sits a small JSON store (`.data/db.json`, gitignored) that
 hashes passwords with scrypt and keeps server-side sessions. It exists only so the
-UI is runnable today.
+UI is runnable today. Delete `.data/` at any time and it re-seeds itself on the
+next request.
 
 ### When Member 3's backend lands
 
@@ -90,6 +91,22 @@ them alone, so the browser and the server cannot drift apart:
 - `lib/contracts/types.ts` — the `Project` / `UserProfile` shapes
 
 Member 3 should **import** these in his Server Actions, not redeclare them.
+
+### One more thing when the backend lands
+
+`organizationId` is currently free text (a company name) and the form field is a
+plain input rather than a dropdown. There is no Organisations table yet, so a
+select would have meant inventing company names. When the table lands, swap the
+input in `components/project/project-form.tsx` for a populated select and change
+`organizationId` to store an id.
+
+---
+
+## Known gaps
+
+- The Organisation field is free text, pending Member 3's table (above).
+- Real Clerk and real PostgreSQL are wired but not exercised here — see
+  `docs/member1-verification.md` for exactly what was and was not tested.
 
 ---
 

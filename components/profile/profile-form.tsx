@@ -176,6 +176,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
                   aria-label="Image URL"
                   invalid={Boolean(errors.avatarUrl)}
                   className="font-mono text-[13px]"
+                  defaultValue={profile.avatarUrl}
                   {...form.register("avatarUrl")}
                 />
                 <p className="text-xs text-ink-3">
@@ -215,6 +216,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
               autoComplete="name"
               placeholder="Ada Lovelace"
               invalid={Boolean(errors.displayName)}
+              defaultValue={profile.displayName}
               {...form.register("displayName")}
             />
           </Field>
@@ -230,6 +232,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
               id="headline"
               placeholder="Building small tools for large problems"
               invalid={Boolean(errors.headline)}
+              defaultValue={profile.headline}
               {...form.register("headline")}
             />
           </Field>
@@ -246,6 +249,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
               className="min-h-28"
               placeholder="A sentence or two about what you make."
               invalid={Boolean(errors.bio)}
+              defaultValue={profile.bio}
               {...form.register("bio")}
             />
           </Field>
@@ -270,6 +274,10 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
                 placeholder={placeholder}
                 invalid={Boolean(errors[name])}
                 className="font-mono text-[13px]"
+                // Mirrors the react-hook-form default so the value reaches the
+                // server-rendered HTML; otherwise the field paints empty and
+                // fills in on hydration.
+                defaultValue={profile[name]}
                 {...form.register(name)}
               />
               {errors[name] ? (

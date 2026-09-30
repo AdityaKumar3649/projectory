@@ -11,6 +11,19 @@ import { NextResponse, type NextRequest } from "next/server";
  * authoritative check is `requireUser()` in `lib/auth/index.ts`, which every
  * protected page calls. Proxy exists to give guests a clean redirect instead of
  * a flash of half-rendered content.
+ *
+ * WHY THERE IS NO "BOUNCE SIGNED-IN USERS OFF /sign-in" RULE HERE
+ * An earlier version redirected an authenticated visitor away from /sign-in.
+ * That rule cannot tell a *valid* session from a *stale* one — the cookie is
+ * still in the browser either way — so it deadlocked with requireUser():
+ *
+ *   stale cookie → /dashboard passes proxy → requireUser() → /sign-in
+ *                → proxy sees the cookie → /dashboard → requireUser() → ...
+ *
+ * which is an infinite redirect loop, and ERR_TOO_MANY_REDIRECTS for the user.
+ * Bouncing a signed-in user off the auth pages is done in `app/(auth)/layout.tsx`
+ * instead, where the session can be resolved properly and the two checks cannot
+ * disagree.
  */
 
 const SESSION_COOKIE = "pj_session";
@@ -18,7 +31,6 @@ const SESSION_COOKIE = "pj_session";
 const CLERK_COOKIE = "__session";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/settings"];
-const AUTH_ROUTES = ["/sign-in", "/sign-up"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -26,7 +38,6 @@ export function proxy(request: NextRequest) {
   const isProtected = PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
-  const isAuthRoute = AUTH_ROUTES.includes(pathname);
   const hasSession = Boolean(
     request.cookies.get(SESSION_COOKIE)?.value ?? request.cookies.get(CLERK_COOKIE)?.value,
   );
@@ -36,10 +47,6 @@ export function proxy(request: NextRequest) {
     // Remember where they were headed so sign-in can send them back.
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
-  }
-
-  if (isAuthRoute && hasSession) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return NextResponse.next();

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { MoreHorizontal } from "lucide-react";
 
-import { IconButton } from "@/components/ui/button";
 import { Chip, StatusBadge } from "@/components/ui/primitives";
 import type { Project } from "@/lib/contracts/types";
 import { prettyUrl, relativeTime } from "@/lib/utils";
@@ -48,11 +47,18 @@ function Row({ project }: { project: Project }) {
   const repo = prettyUrl(project.repoUrl);
 
   return (
-    <li className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-sunken">
+    <li className="relative flex items-center gap-4 px-5 py-4 transition-colors hover:bg-sunken focus-within:bg-sunken">
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        {/*
+          Stretched link: the anchor's ::after covers the whole row, so the row is
+          one click target and one tab stop. The previous version wrapped a <button>
+          in this <Link>, which is invalid HTML and breaks keyboard and screen-reader
+          behaviour — so the trailing "..." is now a decorative affordance inside the
+          same link rather than a second, unreachable control.
+        */}
         <Link
           href={href}
-          className="block truncate text-[15px] font-semibold hover:underline hover:decoration-hairline hover:underline-offset-4"
+          className="block truncate text-[15px] font-semibold after:absolute after:inset-0 after:content-[''] hover:underline hover:decoration-hairline hover:underline-offset-4"
         >
           {project.title}
         </Link>
@@ -70,13 +76,14 @@ function Row({ project }: { project: Project }) {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="relative flex shrink-0 items-center gap-2">
         <StatusBadge status={project.status} />
-        <Link href={href} aria-label={`Open ${project.title}`}>
-          <IconButton label={`Actions for ${project.title}`}>
-            <MoreHorizontal aria-hidden size={16} />
-          </IconButton>
-        </Link>
+        <span
+          aria-hidden
+          className="inline-flex size-8 items-center justify-center rounded-pill border border-hairline text-ink-2"
+        >
+          <MoreHorizontal size={16} />
+        </span>
       </div>
     </li>
   );
