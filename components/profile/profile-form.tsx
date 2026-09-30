@@ -23,6 +23,13 @@ import { cn, initials } from "@/lib/utils";
  */
 const NAME_MAX = 50;
 
+/**
+ * Ties the avatar URL error to its input. This one is not wrapped in `Field`,
+ * so it cannot pick the id up from context the way the other controls do and
+ * has to name it in both places.
+ */
+const AVATAR_URL_MESSAGE_ID = "avatarUrl-field-message";
+
 /** Section label + hairline rule. Local to this file on purpose. */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -174,6 +181,9 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
                   type="url"
                   placeholder="https://example.com/you.jpg"
                   aria-label="Image URL"
+                  aria-describedby={
+                    errors.avatarUrl ? AVATAR_URL_MESSAGE_ID : undefined
+                  }
                   invalid={Boolean(errors.avatarUrl)}
                   className="font-mono text-[13px]"
                   defaultValue={profile.avatarUrl}
@@ -183,7 +193,11 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
                   Paste an image URL. Direct uploads arrive with Member 3&apos;s storage layer.
                 </p>
                 {errors.avatarUrl ? (
-                  <p role="alert" className="text-xs text-rejected-fg">
+                  <p
+                    id={`${AVATAR_URL_MESSAGE_ID}`}
+                    role="alert"
+                    className="text-xs text-rejected-fg"
+                  >
                     {errors.avatarUrl.message}
                   </p>
                 ) : null}
@@ -272,6 +286,9 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
                 type="url"
                 inputMode="url"
                 placeholder={placeholder}
+                aria-describedby={
+                  errors[name] ? `${name}-field-message` : undefined
+                }
                 invalid={Boolean(errors[name])}
                 className="font-mono text-[13px]"
                 // Mirrors the react-hook-form default so the value reaches the
@@ -281,7 +298,11 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
                 {...form.register(name)}
               />
               {errors[name] ? (
-                <p role="alert" className="text-xs text-rejected-fg">
+                <p
+                  id={`${name}-field-message`}
+                  role="alert"
+                  className="text-xs text-rejected-fg"
+                >
                   {errors[name]?.message}
                 </p>
               ) : (

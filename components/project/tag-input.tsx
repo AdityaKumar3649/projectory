@@ -147,8 +147,16 @@ export function TagInput({
         />
       </div>
 
+      {/*
+        The error branch carries `hintId` too, and that matters more than it
+        looks. The input above always points `aria-describedby` at `hintId`, so
+        when an error replaced the hint paragraph the reference pointed at an
+        element that no longer existed — a dangling id that assistive technology
+        silently discards, leaving the control with no accessible description at
+        all. Exactly one paragraph owns the id whichever branch renders.
+      */}
       {error ? (
-        <p role="alert" className="text-xs text-rejected-fg">
+        <p id={hintId} role="alert" className="text-xs text-rejected-fg">
           {error}
         </p>
       ) : (
