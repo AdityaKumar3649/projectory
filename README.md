@@ -102,6 +102,39 @@ input in `components/project/project-form.tsx` for a populated select and change
 
 ---
 
+## Deploying
+
+Works on any Node host. Vercel is the easiest because it detects Next.js.
+
+```bash
+npx vercel          # preview
+npx vercel --prod   # production
+```
+
+No environment variables are required. The app boots with no configuration.
+
+**One thing to know before you deploy.** The local store writes to `.data/`, and
+serverless hosts ship a read-only filesystem. `lib/data/store.ts` probes for a
+writable directory once and falls back to an in-memory store, so the app works
+unmodified — verified by simulating `EROFS`. The consequence is that **data is
+per-instance and resets whenever the instance recycles**: a project you create
+may vanish a few minutes later, and a session cookie stops resolving after a
+cold start. For a day-long demo that is fine. For anything longer, this is
+exactly what Member 3's PostgreSQL layer replaces, and the fallback disappears
+with `lib/data/store.ts`.
+
+### Before you share a link
+
+- The demo login is `demo@projectory.app` / `projectory` and is printed on the
+  sign-in page. That is deliberate for a demo, so do not put anything private in
+  it.
+- Anyone can sign up and create their own projects. That is the intended
+  behaviour of the User Module.
+- `.data/`, `.env*` and `next-env.d.ts` are gitignored, and only tracked files
+  are uploaded, so no local data or secrets are included. Verified.
+
+---
+
 ## Known gaps
 
 - The Organisation field is free text, pending Member 3's table (above).

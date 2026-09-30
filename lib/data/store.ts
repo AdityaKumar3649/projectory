@@ -191,7 +191,43 @@ function seed(): DbShape {
   };
 }
 
+/**
+ * Where the store lives, and whether it can be written at all.
+ *
+ * On a normal machine this is just `.data/db.json` and everything is
+ * straightforward. On a serverless host (Vercel, Netlify, Cloudflare) the
+ * filesystem is read-only apart from /tmp, so writing there throws EROFS and
+ * every request would 500. Rather than special-casing the host, the store
+ * probes once and falls back to an in-memory copy: the app then works on any
+ * platform, with the caveat that state is per-instance and resets on a cold
+ * start. That is fine for a demo and is exactly the behaviour Member 3's real
+ * database will replace.
+ *
+ * The probe is deliberately lazy and cached, so it costs one failed write at
+ * most per process rather than on every request.
+ */
+let writable: boolean | null = null;
+let memory: DbShape | null = null;
+async function canWrite(): Promise<boolean> {
+  if (writable !== null) return writable;
+  const fs = await import("node:fs/promises");
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.access(DATA_DIR, fs.constants.W_OK);
+    writable = true;
+  } catch {
+    writable = false;
+    console.warn(
+      "[projectory] .data is not writable (read-only filesystem?). " +
+        "Falling back to an in-memory store: data resets when the instance " +
+        "restarts. This is expected on serverless hosts.",
+    );
+  }
+  return writable;
+}
+
 async function ensureDb(): Promise<void> {
+  if (!(await canWrite())) return;
   const fs = await import("node:fs/promises");
   try {
     await fs.access(DB_FILE);
@@ -213,8 +249,16 @@ async function ensureDb(): Promise<void> {
  * A structurally wrong but parseable file is caught too — a half-written object
  * missing `projects` would otherwise fail deep inside a query with a confusing
  * message rather than here.
+ *
+ * With no writable filesystem, the in-memory copy is the database: it is seeded
+ * on first read and mutated in place by `withDb`.
  */
 export async function readDb(): Promise<DbShape> {
+  if (!(await canWrite())) {
+    if (!memory) memory = seed();
+    return memory;
+  }
+
   await ensureDb();
   const fs = await import("node:fs/promises");
 
@@ -240,6 +284,10 @@ export async function readDb(): Promise<DbShape> {
 }
 
 async function reseed() {
+  if (!(await canWrite())) {
+    memory = seed();
+    return;
+  }
   const fs = await import("node:fs/promises");
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(DB_FILE, JSON.stringify(seed(), null, 2), "utf8");
@@ -252,13 +300,19 @@ async function reseed() {
 /**
  * Runs `mutator` against the store and persists the result. Writes are queued
  * so two overlapping Server Actions cannot overwrite one another.
+ *
+ * With no writable filesystem the mutator's in-place edit of the shared object
+ * IS the persistence, so the write-back is skipped rather than allowed to throw
+ * and surface as a 500 for a request that actually succeeded.
  */
 export function withDb<T>(mutator: (db: DbShape) => T | Promise<T>): Promise<T> {
   const run = queue.then(async () => {
     const db = await readDb();
     const result = await mutator(db);
-    const fs = await import("node:fs/promises");
-    await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+    if (await canWrite()) {
+      const fs = await import("node:fs/promises");
+      await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+    }
     return result;
   });
   queue = run.then(
