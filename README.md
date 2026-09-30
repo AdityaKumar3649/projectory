@@ -113,15 +113,39 @@ npx vercel --prod   # production
 
 No environment variables are required. The app boots with no configuration.
 
-**One thing to know before you deploy.** The local store writes to `.data/`, and
-serverless hosts ship a read-only filesystem. `lib/data/store.ts` probes for a
-writable directory once and falls back to an in-memory store, so the app works
-unmodified — verified by simulating `EROFS`. The consequence is that **data is
-per-instance and resets whenever the instance recycles**: a project you create
-may vanish a few minutes later, and a session cookie stops resolving after a
-cold start. For a day-long demo that is fine. For anything longer, this is
-exactly what Member 3's PostgreSQL layer replaces, and the fallback disappears
-with `lib/data/store.ts`.
+### Option B: a public URL with no account at all
+
+If you just need a link for a day, a Cloudflare quick tunnel needs no sign-up:
+
+```bash
+npm run build
+npx next start -p 3001
+cloudflared tunnel --url http://localhost:3001 --no-autoupdate
+```
+
+It prints a `https://<random>.trycloudflare.com` URL immediately. Because the
+app runs on your own machine, the file store is writable, so data persists
+normally — the read-only caveat below only applies to real serverless hosts.
+
+Trade-offs: the URL is random each run, the tunnel dies if the process or the
+machine stops, and anyone with the link can sign up. Treat it as a demo link,
+not a permanent home.
+
+**Windows note:** if `cloudflared` is not on your PATH, grab it once from
+<https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/>
+or run
+`Invoke-WebRequest https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe`.
+
+### Serverless caveat
+
+The local store writes to `.data/`, and serverless hosts (Vercel, Netlify,
+Cloudflare Workers) ship a read-only filesystem. `lib/data/store.ts` probes for
+a writable directory once and falls back to an in-memory store, so the app works
+unmodified — verified by simulating `EROFS`. The consequence there is that
+**data is per-instance and resets when the instance recycles**: a project you
+create may vanish a few minutes later, and a session cookie stops resolving
+after a cold start. Fine for a day-long demo, and exactly what Member 3's
+PostgreSQL layer replaces.
 
 ### Before you share a link
 
