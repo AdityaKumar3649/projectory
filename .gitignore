@@ -47,3 +47,7 @@ next-env.d.ts
 
 # Playwright MCP test artefacts
 /.playwright-mcp/
+
+# Written by scripts/serve.ps1 - the quick-tunnel hostname changes every run
+.tunnel-url
+/.logs/
