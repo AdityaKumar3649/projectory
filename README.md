@@ -113,6 +113,47 @@ npx vercel --prod   # production
 
 No environment variables are required. The app boots with no configuration.
 
+### Persistence on a serverless host — read this before deploying
+
+Serverless hosts (Vercel, Netlify, Cloudflare Workers) ship a **read-only
+filesystem**, so the local store cannot write `.data/db.json`. `lib/data/store.ts`
+probes once and picks a backend:
+
+| # | Backend | When | Durability |
+| --- | --- | --- | --- |
+| 1 | `.data/db.json` | any normal machine or container with a disk | survives restarts |
+| 2 | **Vercel Blob** | read-only filesystem **and** a Blob store configured | survives restarts and cold starts |
+| 3 | in-memory | nothing else available | **lost on every cold start** |
+
+**Backend 3 is not merely lossy, it is broken on a multi-instance host.** Every
+instance seeds its own copy, so the seeded demo account still signs in and the
+app looks healthy — but an account created through `/sign-up` is invisible to
+whichever instance serves the next request. This was confirmed on a real Vercel
+deployment before backend 2 was wired in: sign-up appeared to succeed, then the
+same credentials were rejected.
+
+To get durable storage on Vercel, create a Blob store and connect it:
+
+```bash
+npx vercel storage create projectory-db --type blob --access private
+npx vercel storage connect projectory-db --yes
+npm install @vercel/blob
+```
+
+The connection sets `BLOB_STORE_ID` and uses **OIDC**, so there is no token in
+the environment to leak and nothing to rotate by hand. Nothing else changes:
+`readDb()` and `withDb()` keep their existing shape and the write queue and
+recovery paths apply unchanged. The first run seeds the blob, so a fresh
+deployment is not an empty app nobody can sign in to.
+
+Verified on production: sign up, create a project, then sign in again from a
+different browser context — the account and the project were both still there,
+which is exactly the case that failed without Blob.
+
+Blob has no atomic rename, so cross-instance write ordering is best-effort
+until Member 3's Postgres replaces it. The queue still serialises writes within
+an instance.
+
 ### Option B: a public URL with no account at all
 
 If you just need a link for a day, a Cloudflare quick tunnel needs no sign-up:
@@ -123,28 +164,33 @@ npx next start -p 3001
 cloudflared tunnel --url http://localhost:3001 --no-autoupdate
 ```
 
+or just:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\serve.ps1
+powershell -ExecutionPolicy Bypass -File scripts\watchdog.ps1 -Minutes 60
+```
+
 It prints a `https://<random>.trycloudflare.com` URL immediately. Because the
 app runs on your own machine, the file store is writable, so data persists
-normally — the read-only caveat below only applies to real serverless hosts.
+normally — the read-only caveat above only applies to real serverless hosts.
 
-Trade-offs: the URL is random each run, the tunnel dies if the process or the
-machine stops, and anyone with the link can sign up. Treat it as a demo link,
-not a permanent home.
+Trade-offs: the URL is **random each run**, the tunnel dies if the process or
+the machine stops, and anyone with the link can sign up. Treat it as a demo link,
+not a permanent home. The watchdog restarts a dead tunnel, but a restart issues a
+**new** hostname, so the current URL is always written to `.tunnel-url`.
 
 **Windows note:** if `cloudflared` is not on your PATH, grab it once from
 <https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/>
 or run
 `Invoke-WebRequest https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe`.
 
-### Serverless caveat
+### Serverless caveat without Blob
 
-The local store writes to `.data/`, and serverless hosts (Vercel, Netlify,
-Cloudflare Workers) ship a read-only filesystem. `lib/data/store.ts` probes for
-a writable directory once and falls back to an in-memory store, so the app works
-unmodified — verified by simulating `EROFS`. The consequence there is that
-**data is per-instance and resets when the instance recycles**: a project you
-create may vanish a few minutes later, and a session cookie stops resolving
-after a cold start. Fine for a day-long demo, and exactly what Member 3's
+If you deploy somewhere read-only and do **not** configure a Blob store, the
+in-memory fallback applies: **data is per-instance and resets when the instance
+recycles**, and new sign-ups do not survive. Configure Blob or use a real
+database first. This is also exactly what Member 3's
 PostgreSQL layer replaces.
 
 ### Before you share a link
