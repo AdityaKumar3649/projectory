@@ -51,3 +51,4 @@ next-env.d.ts
 # Written by scripts/serve.ps1 - the quick-tunnel hostname changes every run
 .tunnel-url
 /.logs/
+.vercel

@@ -1,5 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
+import { blobConfigured, readBlob, writeBlob } from "@/lib/data/blob-store";
 import type { Project, UserProfile } from "@/lib/contracts/types";
 
 /**
@@ -195,13 +196,19 @@ function seed(): DbShape {
  * Where the store lives, and whether it can be written at all.
  *
  * On a normal machine this is just `.data/db.json` and everything is
- * straightforward. On a serverless host (Vercel, Netlify, Cloudflare) the
- * filesystem is read-only apart from /tmp, so writing there throws EROFS and
- * every request would 500. Rather than special-casing the host, the store
- * probes once and falls back to an in-memory copy: the app then works on any
- * platform, with the caveat that state is per-instance and resets on a cold
- * start. That is fine for a demo and is exactly the behaviour Member 3's real
- * database will replace.
+ * straightforward. On a serverless host the filesystem is read-only apart from
+ * /tmp, so writing there throws EROFS and every request would 500. Rather than
+ * special-casing the host, the store probes once and picks a backend:
+ *
+ * 1. `.data/db.json`, the normal case.
+ * 2. Vercel Blob, when the filesystem is read-only AND a store is configured.
+ * 3. An in-memory copy, as a last resort.
+ *
+ * Step 2 exists because step 3 is not actually usable on a multi-instance host.
+ * Every instance seeds its own memory copy, so an account created through
+ * /sign-up is invisible to whichever instance serves the next request. That was
+ * verified on a real Vercel deployment before Blob was wired in: the sign-up
+ * appeared to succeed and the account then could not be signed into.
  *
  * The probe is deliberately lazy and cached, so it costs one failed write at
  * most per process rather than on every request.
@@ -218,12 +225,37 @@ async function canWrite(): Promise<boolean> {
   } catch {
     writable = false;
     console.warn(
-      "[projectory] .data is not writable (read-only filesystem?). " +
-        "Falling back to an in-memory store: data resets when the instance " +
-        "restarts. This is expected on serverless hosts.",
+      "[projectory] .data is not writable (read-only filesystem). " +
+        (blobConfigured()
+          ? "Using Vercel Blob for persistence."
+          : "Falling back to an in-memory store: data resets when the " +
+            "instance restarts and is NOT shared between instances."),
     );
   }
   return writable;
+}
+
+/** True when the document lives in Blob rather than in memory. */
+function usesBlob(): boolean {
+  return !writable && blobConfigured();
+}
+
+/**
+ * Persists the document to whichever backend is active.
+ *
+ * Blob has no atomic rename, so a concurrent write can still be lost the way a
+ * torn file read was before the queue was introduced. The queue in `withDb`
+ * serialises writes within one instance, which is the same guarantee the file
+ * store has; across instances this is best-effort until Member 3's database
+ * takes over, and is noted rather than papered over.
+ */
+async function persist(db: DbShape): Promise<void> {
+  if (await canWrite()) {
+    await writeAtomic(db);
+  } else if (usesBlob()) {
+    await writeBlob(JSON.stringify(db, null, 2));
+  }
+  memory = db;
 }
 
 async function ensureDb(): Promise<void> {
@@ -293,6 +325,16 @@ async function writeAtomic(db: DbShape): Promise<void> {
  */
 export async function readDb(): Promise<DbShape> {
   if (!(await canWrite())) {
+    if (usesBlob()) {
+      if (!memory) {
+        // Read once per instance and keep the snapshot in memory. Every request
+        // hitting Blob would be a network round trip on the hot path, and the
+        // snapshot still gets rewritten on each write via `persist`.
+        const raw = await readBlob();
+        memory = raw ? parseOrSeed(raw) : await seedBlob();
+      }
+      return memory;
+    }
     if (!memory) memory = seed();
     return memory;
   }
@@ -336,6 +378,27 @@ export async function readDb(): Promise<DbShape> {
   return db;
 }
 
+/** Parses a stored document, falling back to the seed rather than throwing. */
+function parseOrSeed(raw: string): DbShape {
+  try {
+    const parsed = JSON.parse(raw) as DbShape;
+    if (Array.isArray(parsed.projects) && Array.isArray(parsed.accounts)) return parsed;
+  } catch {
+    // fall through to the seed
+  }
+  return seed();
+}
+
+/**
+ * Writes the seed into Blob on first run, so a fresh deployment starts with the
+ * demo account instead of an empty app that nobody can sign in to.
+ */
+async function seedBlob(): Promise<DbShape> {
+  const fresh = seed();
+  await writeBlob(JSON.stringify(fresh, null, 2));
+  return fresh;
+}
+
 /**
  * Runs `mutator` against the store and persists the result.
  *
@@ -345,18 +408,15 @@ export async function readDb(): Promise<DbShape> {
  * data with the demo seed. Serialising them costs nothing measurable here and
  * removes the whole class of race.
  *
- * With no writable filesystem the mutator's in-place edit of the shared object
- * IS the persistence, so the write-back is skipped rather than allowed to throw
- * and surface as a 500 for a request that actually succeeded.
+ * With no writable filesystem AND no Blob store the mutator's in-place edit of
+ * the shared object IS the persistence, so the write-back is skipped rather than
+ * allowed to throw and surface as a 500 for a request that actually succeeded.
  */
 export function withDb<T>(mutator: (db: DbShape) => T | Promise<T>): Promise<T> {
   const run = queue.then(async () => {
     const db = await readDb();
     const result = await mutator(db);
-    if (await canWrite()) {
-      await writeAtomic(db);
-      memory = db;
-    }
+    await persist(db);
     return result;
   });
   queue = run.then(
