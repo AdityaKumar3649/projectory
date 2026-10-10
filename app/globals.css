@@ -56,6 +56,17 @@
   --pj-dot-pending: #b45309;
   --pj-dot-approved: #0f7b4f;
   --pj-dot-rejected: #b42318;
+
+  /* Second surface level. `base` holds the page, `surface` holds content,
+     `surface-2` sits above that for raised panels and nested rows. Three
+     levels is the most that stays legible - a fourth reads as noise. */
+  --pj-surface-2: #f7f7f9;
+  /* Tint for interactive rows, list items and hover. Separate from surface-2
+     because it needs to be visible enough to register as feedback without
+     competing with a selected state. */
+  --pj-hover: #f1f1f4;
+  /* Selection, for the currently chosen filter or a picked table row. */
+  --pj-selected: #e9edfd;
 }
 
 /* ---- Dark ----------------------------------------------------------------
@@ -128,6 +139,13 @@
   --pj-dot-pending: #f0c674;
   --pj-dot-approved: #6ee7a8;
   --pj-dot-rejected: #f8a49b;
+
+  /* Dark surfaces lift rather than darken. A near-black canvas has no room
+     below #0b0b0e, so elevation has to come from adding light - the same
+     reason a dark shadow on a dark surface is invisible. */
+  --pj-surface-2: #1b1b21;
+  --pj-hover: #21212a;
+  --pj-selected: #1f2740;
 }
 
 @theme inline {
@@ -165,15 +183,42 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
 
-  /* One shadow, popovers only. Cards use borders, never shadows. */
+  /* Elevation. Three levels, each with a job, because a single shadow token
+     forces a choice between "a card floats" and "a dialog floats" and the
+     result is a UI that reads as flat.
+
+     - raised : interactive panels, sticky bars, the selected region of a list
+     - pop    : menus and popovers that sit above a panel
+     - overlay: dialogs, the highest thing on screen
+
+     Deliberately low-contrast and small-offset. A large soft shadow on a white
+     card is the single fastest way to make an interface look like a template. */
+  --shadow-raised: 0 1px 2px rgb(12 12 15 / 0.04), 0 2px 8px rgb(12 12 15 / 0.04);
   --shadow-pop: 0 4px 12px rgb(12 12 15 / 0.08);
+  --shadow-overlay: 0 12px 32px -8px rgb(12 12 15 / 0.16), 0 4px 12px rgb(12 12 15 / 0.08);
+
+  /* A hairline that survives on any surface, for the top edge of a raised
+     panel where a border alone disappears against a same-value fill. */
+  --color-surface-2: var(--pj-surface-2);
+  --color-hover: var(--pj-hover);
+  --color-selected: var(--pj-selected);
 }
 
-/* In dark mode a shadow on a dark surface reads as nothing, so elevation comes
-   from a border and a lighter fill instead. */
+/* In dark mode a shadow cast on a dark surface reads as nothing, so elevation
+   has to be rebuilt from an inset highlight plus a much darker drop. The inset
+   top edge is doing the real work: it draws the top edge of a raised panel
+   where a border of the same value as the fill would be invisible. */
+:root[data-theme="dark"] .shadow-raised,
+:root:not([data-theme="light"]) .shadow-raised {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 2px 10px rgb(0 0 0 / 0.45);
+}
 :root[data-theme="dark"] .shadow-pop,
 :root:not([data-theme="light"]) .shadow-pop {
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.5);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.55);
+}
+:root[data-theme="dark"] .shadow-overlay,
+:root:not([data-theme="light"]) .shadow-overlay {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 16px 40px -8px rgb(0 0 0 / 0.7);
 }
 
 @layer base {
