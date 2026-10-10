@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, ShieldCheck } from "lucide-react";
 
 import { signOutAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, Chip } from "@/components/ui/primitives";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import type { AuthUser } from "@/lib/contracts/types";
+import { isAdmin } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
 
 /**
@@ -91,6 +92,21 @@ export function AppNav({ user, active: forced }: { user: AuthUser; active?: NavK
         <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
           {user.isDemo ? (
             <Chip className="hidden h-5 px-2 text-[11px] sm:inline-flex">Demo</Chip>
+          ) : null}
+          {/*
+            Gated by `isAdmin`, the same rule the admin layout and every admin
+            action use. Showing this link is only a convenience - the rule is
+            re-checked on the route and again inside each Server Action, so hiding
+            it here is not what keeps anyone out.
+          */}
+          {isAdmin(user.id) ? (
+            <Link
+              href="/admin"
+              className="hidden h-7 items-center gap-1 rounded-pill bg-pending px-2.5 text-[11px] font-semibold text-pending-fg transition-opacity hover:opacity-80 sm:inline-flex"
+            >
+              <ShieldCheck size={12} aria-hidden />
+              Admin
+            </Link>
           ) : null}
           <ThemeToggle />
           <Avatar

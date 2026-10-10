@@ -30,7 +30,7 @@ const SESSION_COOKIE = "pj_session";
 /** Clerk's own cookie, checked so this file keeps working once Clerk is enabled. */
 const CLERK_COOKIE = "__session";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/settings"];
+const PROTECTED_PREFIXES = ["/dashboard", "/settings", "/admin"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
