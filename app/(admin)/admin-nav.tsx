@@ -43,7 +43,7 @@ export function AdminNav() {
       <div className="flex items-center gap-2 px-1 lg:pb-1 lg:pt-1">
         <span
           aria-hidden
-          className="grid size-[22px] shrink-0 place-items-center rounded-[6px] bg-accent text-[12px] font-bold text-on-ink"
+          className="grid size-[22px] shrink-0 place-items-center rounded-xs bg-accent text-[12px] font-bold text-on-ink"
         >
           P
         </span>
@@ -75,7 +75,7 @@ export function AdminNav() {
                     "flex h-[34px] items-center gap-2 rounded-input px-2.5 text-[13px] whitespace-nowrap transition-colors lg:gap-2.5",
                     active
                       ? "bg-accent-soft font-semibold text-accent"
-                      : "font-medium text-ink-2 hover:bg-sunken hover:text-ink",
+                      : "font-medium text-ink-2 hover:bg-hover hover:text-ink",
                   )}
                 >
                   <Icon size={15} aria-hidden className={active ? "text-accent" : "text-ink-3"} />
@@ -90,7 +90,7 @@ export function AdminNav() {
       <div className="hidden border-t border-hairline pt-2 lg:block">
         <Link
           href="/dashboard"
-          className="flex h-[34px] items-center gap-2.5 rounded-input px-2.5 text-[13px] font-medium text-ink-2 transition-colors hover:bg-sunken hover:text-ink"
+          className="flex h-[34px] items-center gap-2.5 rounded-input px-2.5 text-[13px] font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink"
         >
           <ArrowLeft size={15} aria-hidden className="text-ink-3" />
           Back to my projects

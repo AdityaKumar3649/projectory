@@ -124,7 +124,7 @@ export function SignInForm({ next }: { next?: string }) {
           type="checkbox"
           checked={remember}
           onChange={(event) => setRemember(event.target.checked)}
-          className="size-4 shrink-0 cursor-pointer rounded border border-line accent-accent"
+          className="size-4 shrink-0 cursor-pointer rounded border border-control-border accent-accent"
         />
         Keep me signed in
       </label>

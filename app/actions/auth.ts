@@ -101,7 +101,13 @@ export async function signUpAction(
   }
 
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, result.token, cookieOptions(true));
+  // Not a hardcoded 30 days. Sign-in has always let the member choose between a
+  // persistent cookie and one that dies with the browser; sign-up offered no
+  // such control but still issued the persistent one, so anyone registering on
+  // a shared or library machine stayed signed in for a month, and the privacy
+  // page described behaviour that did not apply to this path. Absent the field,
+  // `wantsRemember` reads false - the safe default.
+  jar.set(SESSION_COOKIE, result.token, cookieOptions(wantsRemember(formData)));
   redirect(safeNext(formData.get("next")));
 }
 

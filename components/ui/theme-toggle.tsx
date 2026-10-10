@@ -98,7 +98,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       title={label}
       className={cn(
         "inline-flex size-8 shrink-0 items-center justify-center rounded-pill border border-hairline",
-        "text-ink-2 transition-colors hover:bg-sunken hover:text-ink",
+        "text-ink-2 transition-colors hover:bg-hover hover:text-ink",
         className,
       )}
     >

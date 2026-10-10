@@ -302,11 +302,20 @@ async function writeAtomic(db: DbShape): Promise<void> {
   await fs.writeFile(tmp, JSON.stringify(db, null, 2), "utf8");
   try {
     await fs.rename(tmp, DB_FILE);
-  } catch (error) {
-    // Windows can refuse a rename onto an existing file.
+  } catch (renameError) {
+    // Windows can refuse a rename onto an existing file - routinely, when the
+    // folder is inside OneDrive and the sync client holds a handle.
     await fs.rm(tmp, { force: true }).catch(() => {});
-    await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2), "utf8");
-    throw error;
+    try {
+      await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+    } catch {
+      // Only now is the write genuinely lost. Rethrowing the *rename* error
+      // after the fallback succeeded told every caller the save failed when the
+      // bytes were already on disk: sign-up pushed the account, then threw, and
+      // the user was shown an error for a registration that had worked. Retrying
+      // then said the email was taken.
+      throw renameError;
+    }
   }
 }
 
@@ -447,11 +456,11 @@ async function seedBlob(): Promise<DbShape> {
  * the shared object IS the persistence, so the write-back is skipped rather than
  * allowed to throw and surface as a 500 for a request that actually succeeded.
  */
-export function withDb<T>(mutator: (db: DbShape) => T | Promise<T>): Promise<T> {
+export function withDb<T>(mutator: (db: DbShape) => T | Promise<T>, write = true): Promise<T> {
   const run = queue.then(async () => {
     const db = await readDb();
     const result = await mutator(db);
-    await persist(db);
+    if (write) await persist(db);
     return result;
   });
   queue = run.then(
@@ -461,7 +470,15 @@ export function withDb<T>(mutator: (db: DbShape) => T | Promise<T>): Promise<T> 
   return run;
 }
 
-/** A read that cannot interleave with a write. */
+/**
+ * A read that cannot interleave with a write, and does not write one back.
+ *
+ * The `write = false` matters more than it looks. `withDb` persisted
+ * unconditionally, so this pure read was serialising the entire document and
+ * rewriting the store on every call - and it backs `resolveSession`, which runs
+ * on every authenticated request. On the Blob backend that turned each page
+ * view into a versioned object overwrite.
+ */
 export function readDbQueued(): Promise<DbShape> {
-  return withDb((db) => db);
+  return withDb((db) => db, false);
 }

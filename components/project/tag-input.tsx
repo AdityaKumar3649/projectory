@@ -108,17 +108,21 @@ export function TagInput({
         className={cn(
           "flex min-h-10 flex-wrap items-center gap-2 rounded-input border bg-surface px-2 py-1.5 transition-colors",
           "focus-within:border-accent focus-within:ring-2 focus-within:ring-accent",
-          error ? "border-rejected-fg" : "border-line",
+          error ? "border-rejected-fg" : "border-control-border",
         )}
       >
         {value.map((tag) => (
-          <Chip key={tag} className="gap-1">
+          <Chip key={tag} className="gap-0.5 pr-1.5">
             {tag}
             <button
               type="button"
               onClick={() => removeTag(tag)}
               aria-label={`Remove tag ${tag}`}
-              className="-mr-1 inline-flex size-4 items-center justify-center rounded-pill text-ink-3 transition-colors hover:text-ink"
+              // The glyph is 16px because the chip is 24px tall and anything
+              // larger stops looking removable. WCAG 2.5.8 wants a 24px
+              // target, so the hit area is grown with a pseudo-element instead
+              // of by growing the button - same reach, no layout shift.
+              className="relative -mr-1 inline-flex size-4 items-center justify-center rounded-pill text-ink-3 transition-colors hover:text-ink after:absolute after:-inset-2 after:content-['']"
             >
               <X size={12} aria-hidden />
             </button>

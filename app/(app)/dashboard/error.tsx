@@ -30,7 +30,7 @@ export default function DashboardError({
         <TriangleAlert aria-hidden size={20} />
       </span>
 
-      <h2 className="text-[17px] font-semibold">Something went wrong loading your projects.</h2>
+      <h1 className="text-[17px] font-semibold">Something went wrong loading your projects.</h1>
 
       <p className="max-w-[400px] text-[13px] leading-relaxed text-ink-3">
         The list could not be rendered. This is usually temporary - the details are in the server log

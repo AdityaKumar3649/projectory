@@ -47,7 +47,7 @@ export function Input({
     <input
       aria-invalid={invalid || undefined}
       aria-describedby={useDescribedBy(describedBy)}
-      className={cn(box, "h-10", invalid ? "border-rejected-fg" : "border-line", className)}
+      className={cn(box, "h-10", invalid ? "border-rejected-fg" : "border-control-border", className)}
       {...props}
     />
   );
@@ -66,7 +66,7 @@ export function Textarea({
       className={cn(
         box,
         "min-h-22 resize-y py-3 leading-relaxed",
-        invalid ? "border-rejected-fg" : "border-line",
+        invalid ? "border-rejected-fg" : "border-control-border",
         className,
       )}
       {...props}
@@ -90,7 +90,7 @@ export function Select({
         className={cn(
           box,
           "h-10 cursor-pointer appearance-none pr-9",
-          invalid ? "border-rejected-fg" : "border-line",
+          invalid ? "border-rejected-fg" : "border-control-border",
           className,
         )}
         {...props}

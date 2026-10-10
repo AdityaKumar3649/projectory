@@ -160,7 +160,7 @@ export function ProjectForm({
       */}
       <Link
         href="/dashboard"
-        className="-my-1.5 inline-flex items-center gap-1.5 self-start rounded-sm py-1.5 text-[13px] text-ink-3 transition-colors hover:text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="-my-1.5 inline-flex items-center gap-1.5 self-start rounded-xs py-1.5 text-[13px] text-ink-3 transition-colors hover:text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <ArrowLeft size={14} className="text-ink-3" aria-hidden />
         Projects

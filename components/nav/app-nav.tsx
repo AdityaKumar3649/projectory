@@ -73,8 +73,19 @@ export function AppNav({ user, active: forced }: { user: AuthUser; active?: NavK
 
             if (!enabled) {
               return (
-                <span key={key} aria-disabled className={cn(className, "cursor-not-allowed opacity-45")} title="Coming soon">
+                <span
+                  key={key}
+                  role="link"
+                  aria-disabled="true"
+                  // Not `opacity-45`. Opacity composites the label toward the
+                  // background and drops it to 2.43:1, and `aria-disabled` on
+                  // a real role is still perceivable content, so the text has
+                  // to keep its contrast. ink-3 passes at 5.19:1.
+                  className={cn(className, "cursor-not-allowed text-ink-3")}
+                  title="Coming soon"
+                >
                   {label}
+                  <span className="sr-only"> (coming soon)</span>
                 </span>
               );
             }
@@ -102,7 +113,7 @@ export function AppNav({ user, active: forced }: { user: AuthUser; active?: NavK
           {isAdmin(user.id) ? (
             <Link
               href="/admin"
-              className="hidden h-7 items-center gap-1 rounded-pill bg-pending px-2.5 text-[11px] font-semibold text-pending-fg transition-opacity hover:opacity-80 sm:inline-flex"
+              className="hidden h-7 items-center gap-1 rounded-pill bg-pending px-2.5 text-[11px] font-semibold text-pending-fg transition-colors hover:bg-pending/90 sm:inline-flex"
             >
               <ShieldCheck size={12} aria-hidden />
               Admin

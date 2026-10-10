@@ -170,7 +170,7 @@ export function AdminProjectsClient({
                 )}
               >
                 {key === "all" ? "All" : key.charAt(0).toUpperCase() + key.slice(1)}
-                <span className={cn("tabular-nums", active ? "opacity-80" : "text-ink-3")}>
+                <span className={cn("tabular-nums", active ? "text-ink-2" : "text-ink-3")}>
                   {counts[key]}
                 </span>
               </button>
@@ -185,7 +185,7 @@ export function AdminProjectsClient({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search projects or owners"
-            className="h-[30px] w-full min-w-0 rounded-input border border-line bg-surface pl-3 pr-3 text-[13px] text-ink placeholder:text-ink-3 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="h-[30px] w-full min-w-0 rounded-input border border-control-border bg-surface pl-3 pr-3 text-[13px] text-ink placeholder:text-ink-3 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           />
         </label>
       </div>
@@ -215,7 +215,7 @@ export function AdminProjectsClient({
           </thead>
           <tbody className="divide-y divide-hairline">
             {visible.map((p) => (
-              <tr key={p.id} className="transition-colors hover:bg-sunken/60">
+              <tr key={p.id} className="transition-colors hover:bg-hover">
                 <td className="px-4 py-3">
                   <div className="flex items-start gap-2.5">
                     <span
@@ -259,7 +259,7 @@ export function AdminProjectsClient({
                         type="button"
                         disabled={isPending}
                         onClick={() => setConfirm({ type: "approve", project: p })}
-                        className="h-8 bg-approved px-3 text-[12px] font-semibold text-approved-fg hover:opacity-90"
+                        className="h-8 bg-approved px-3 text-[12px] font-semibold text-approved-fg transition-colors hover:bg-approved/90"
                       >
                         <Check size={13} aria-hidden />
                         Approve
@@ -270,7 +270,7 @@ export function AdminProjectsClient({
                         type="button"
                         disabled={isPending}
                         onClick={() => setConfirm({ type: "reject", project: p })}
-                        className="h-8 bg-rejected px-3 text-[12px] font-semibold text-rejected-fg hover:opacity-90"
+                        className="h-8 bg-rejected px-3 text-[12px] font-semibold text-rejected-fg transition-colors hover:bg-rejected/90"
                       >
                         <X size={13} aria-hidden />
                         Reject

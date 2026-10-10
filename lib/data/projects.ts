@@ -98,10 +98,22 @@ export async function updateProject(
       liveUrl: input.liveUrl,
       tags: input.tags,
       organizationId: input.organizationId === "" ? null : input.organizationId,
-      // Status is intentionally NOT editable here. A member changing their own
-      // project must not be able to approve it; only Member 3's admin flow does.
-      status: previous.status,
+      // A member may not set status from the client - approving your own work
+      // is the one thing this route must never allow. "pending" and "approved"
+      // stay put for that reason.
+      //
+      // "rejected" is the exception, and only in one direction. The edit form
+      // tells the member they can revise a rejected project and have it re-enter
+      // review; without this the copy described a feature that did not exist
+      // and their revision sat rejected forever. It can only move to "pending",
+      // never past it, so it is not a privilege escalation.
+      status: previous.status === "rejected" ? ("pending" satisfies ProjectStatus) : previous.status,
       updatedAt: new Date().toISOString(),
+      // Re-submitting clears the previous decision, otherwise the owner would
+      // keep reading a rejection note about a version they have already fixed.
+      moderatedAt: previous.status === "rejected" ? null : previous.moderatedAt,
+      moderatedBy: previous.status === "rejected" ? null : previous.moderatedBy,
+      moderationNote: previous.status === "rejected" ? null : previous.moderationNote,
     };
     db.projects[index] = next;
     return { ok: true, data: next } satisfies ActionResult<Project>;

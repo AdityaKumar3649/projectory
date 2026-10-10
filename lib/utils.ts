@@ -6,6 +6,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Built once at module scope. Constructing an Intl formatter is the expensive
+ * part, and `relativeTime` runs once per project row on every dashboard render.
+ */
+const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
 /** "updated 2 days ago" — kept here so every screen phrases time the same way. */
 export function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
@@ -20,13 +26,12 @@ export function relativeTime(iso: string): string {
     [12, "month"],
     [Number.POSITIVE_INFINITY, "year"],
   ];
-  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
   let value = seconds;
   for (const [step, unit] of units) {
-    if (Math.abs(value) < step) return rtf.format(-Math.round(value), unit);
+    if (Math.abs(value) < step) return RELATIVE.format(-Math.round(value), unit);
     value /= step;
   }
-  return rtf.format(-Math.round(value), "year");
+  return RELATIVE.format(-Math.round(value), "year");
 }
 
 export function formatDate(iso: string): string {

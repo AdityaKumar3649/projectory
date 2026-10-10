@@ -39,7 +39,7 @@ export default function AdminError({
         </Button>
         <Link
           href="/dashboard"
-          className="inline-flex h-10 items-center rounded-pill border border-line px-4 text-[13px] font-medium text-ink-2 transition-colors hover:bg-sunken"
+          className="inline-flex h-10 items-center rounded-pill border border-control-border px-4 text-[13px] font-medium text-ink-2 transition-colors hover:bg-sunken"
         >
           Back to my projects
         </Link>

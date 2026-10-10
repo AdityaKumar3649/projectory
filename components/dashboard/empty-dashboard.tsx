@@ -57,7 +57,10 @@ export function EmptyDashboard({
         You have no {FILTER_NOUN[filter]} to show. Switch the filter above, or clear it to see
         everything you have submitted.
       </p>
-      <Link href="/dashboard" className="text-[13px] font-medium text-accent hover:underline">
+      <Link
+        href="/dashboard"
+        className="-my-1 inline-flex min-h-6 items-center self-start rounded-input px-2 text-[13px] font-medium text-accent hover:bg-accent-soft hover:underline"
+      >
         Clear the filter
       </Link>
     </Panel>

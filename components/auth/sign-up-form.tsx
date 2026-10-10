@@ -128,6 +128,21 @@ export function SignUpForm({ next }: { next?: string }) {
           toggle the control, so Terms and Privacy stay independently clickable.
           The server action reads `terms` and refuses the signup without it, so
           the box is enforced rather than decorative. */}
+      {/* Unchecked by default. A brand-new account on a shared machine should
+          not get a 30-day cookie the member never asked for. */}
+      <label
+        htmlFor="sign-up-remember"
+        className="flex cursor-pointer items-center gap-2.5 text-[13px] text-ink-2"
+      >
+        <input
+          id="sign-up-remember"
+          name="remember"
+          type="checkbox"
+          className="size-4 shrink-0 cursor-pointer rounded border border-control-border accent-accent"
+        />
+        Keep me signed in on this device
+      </label>
+
       <label className="flex cursor-pointer items-start gap-2.5 text-[13px] leading-[1.5] text-ink-2">
         <input
           type="checkbox"
@@ -139,7 +154,7 @@ export function SignUpForm({ next }: { next?: string }) {
           }}
           aria-invalid={termsError ? true : undefined}
           aria-describedby={termsError ? "terms-error" : undefined}
-          className="mt-px size-4 shrink-0 cursor-pointer rounded border border-line accent-accent"
+          className="mt-px size-4 shrink-0 cursor-pointer rounded border border-control-border accent-accent"
         />
         <span>
           I agree to the{" "}

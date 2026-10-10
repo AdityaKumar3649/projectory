@@ -31,20 +31,24 @@ export async function localSignUp(raw: unknown): Promise<LocalAuthOutcome> {
   }
   const { name, email, password } = parsed.data;
 
-  const db = await readDbQueued();
-  if (db.accounts.some((a) => a.email === email)) {
-    return {
-      ok: false,
-      error: "That email is already registered.",
-      fieldErrors: { email: "That email is already registered." },
-    };
-  }
-
   const userId = newId("user");
   const { salt, hash } = hashPassword(password);
   const now = new Date().toISOString();
 
-  await withDb((write) => {
+  // The duplicate check and the insert have to be the SAME queue slot.
+  //
+  // As two separate calls they were a time-of-check-to-time-of-use race: two
+  // simultaneous sign-ups for one address both passed the check and both
+  // wrote, leaving two accounts sharing an email - after which `localSignIn`'s
+  // `find` silently picked whichever came first. The queue serialises this
+  // process; on the Blob backend it does not serialise across instances, but
+  // collapsing the window to a single critical section is still strictly
+  // better than two, and it is the only correctness guarantee available
+  // without a unique index.
+  const written = await withDb((write) => {
+    if (write.accounts.some((a) => a.email === email)) {
+      return { ok: false as const };
+    }
     write.accounts.push({ id: userId, email, name, passwordHash: hash, passwordSalt: salt, createdAt: now });
     write.profiles.push({
       userId,
@@ -58,7 +62,16 @@ export async function localSignUp(raw: unknown): Promise<LocalAuthOutcome> {
       avatarUrl: "",
       createdAt: now,
     });
+    return { ok: true as const };
   });
+
+  if (!written.ok) {
+    return {
+      ok: false,
+      error: "That email is already registered.",
+      fieldErrors: { email: "That email is already registered." },
+    };
+  }
 
   const session = await createSession(userId);
   return {

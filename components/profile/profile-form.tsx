@@ -120,8 +120,6 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
    */
   const onSubmit = form.handleSubmit((values) => {
     setState(null);
-    // Zod trims, so `values` is exactly what the server will persist.
-    setLastSaved(values);
     startTransition(async () => {
       const fd = new FormData();
       for (const [key, value] of Object.entries(values)) fd.set(key, String(value ?? ""));
@@ -132,6 +130,13 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
           if (field in values) form.setError(field as keyof ProfileFormValues, { message });
         }
       } else if (result?.success) {
+        // Only now. It used to be set on every submit, so a FAILED save gave
+        // `lastSaved` a new object identity, re-running the reset effect below
+        // on the same commit as the setError calls - and `reset()` clears
+        // `errors` unless told otherwise. The validation message the member had
+        // just triggered would vanish, leaving only the banner.
+        // Zod trims, so `values` is exactly what the server persisted.
+        setLastSaved(values);
         setState(result);
         setSavedCount((count) => count + 1);
       }
@@ -140,10 +145,15 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
 
   // Re-seed the form with the saved values so the inputs stop looking dirty
   // and the counters agree with what is now in the database.
+  //
+  // Keyed off `savedCount` alone, and `keepErrors` is set as a second guard:
+  // a reset normally wipes `formState.errors`, so anything scheduled on the
+  // same commit as a `setError` would silently disappear.
   useEffect(() => {
     if (savedCount === 0 || !lastSaved) return;
-    form.reset(lastSaved);
-  }, [savedCount, lastSaved, form]);
+    form.reset(lastSaved, { keepErrors: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedCount]);
 
   const counter = (value: string, max: number) => `${value.length} / ${max}`;
 
@@ -152,7 +162,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
       {/* Same tap-target fix as the project form's back-link; see the note there. */}
       <Link
         href="/dashboard"
-        className="-my-1.5 inline-flex items-center gap-1.5 self-start rounded-sm py-1.5 text-[13px] text-ink-3 transition-colors hover:text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="-my-1.5 inline-flex items-center gap-1.5 self-start rounded-xs py-1.5 text-[13px] text-ink-3 transition-colors hover:text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <ArrowLeft size={14} className="text-ink-3" aria-hidden />
         Projects

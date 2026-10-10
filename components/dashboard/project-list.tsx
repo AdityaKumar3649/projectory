@@ -47,7 +47,7 @@ function Row({ project }: { project: Project }) {
   const repo = prettyUrl(project.repoUrl);
 
   return (
-    <li className="relative flex items-center gap-4 px-5 py-4 transition-colors hover:bg-sunken focus-within:bg-sunken">
+    <li className="relative flex items-center gap-4 px-5 py-4 transition-colors hover:bg-hover focus-within:bg-hover">
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {/*
           Stretched link: the anchor's ::after covers the whole row, so the row is

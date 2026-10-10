@@ -12,7 +12,7 @@ export const buttonVariants = {
     // `text-on-ink` rather than `text-white`: in dark mode --pj-ink is near
     // white, so a primary button must use the inverted token to stay readable.
     primary: "bg-ink text-on-ink hover:bg-ink-2",
-    secondary: "bg-surface text-ink border border-line hover:bg-sunken",
+    secondary: "bg-surface text-ink border border-control-border hover:bg-sunken",
     ghost: "text-ink-2 hover:bg-sunken",
     destructive: "bg-surface text-rejected-fg border border-rejected-fg hover:bg-rejected",
   },
@@ -38,7 +38,12 @@ export function buttonClass({
   className?: string;
 } = {}) {
   return cn(
-    "inline-flex items-center justify-center gap-2 rounded-pill font-medium whitespace-nowrap",
+    // `no-underline` belongs in the token, not at each call site. This class is
+    // applied to <Link> in five places and Tailwind's preflight does not strip
+    // text-decoration from <a>, so without it every one of those rendered as an
+    // underlined button - and the single call site that remembered to append
+    // `no-underline` itself was the odd one out.
+    "inline-flex items-center justify-center gap-2 rounded-pill font-medium whitespace-nowrap no-underline",
     "transition-colors select-none",
     "disabled:pointer-events-none disabled:border-transparent disabled:bg-hairline disabled:text-ink-3",
     buttonVariants.variant[variant],

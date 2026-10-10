@@ -77,7 +77,7 @@ export function AdminUsersClient({
             {accounts.map((a) => {
               const isSelf = a.id === viewerId;
               return (
-                <tr key={a.id} className="transition-colors hover:bg-sunken/60">
+                <tr key={a.id} className="transition-colors hover:bg-hover">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <span

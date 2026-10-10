@@ -11,7 +11,7 @@ export default function DashboardProjectNotFound() {
         <SearchX aria-hidden size={20} />
       </span>
 
-      <h2 className="text-[17px] font-semibold">Project not found</h2>
+      <h1 className="text-[17px] font-semibold">Project not found</h1>
 
       <p className="max-w-[400px] text-[13px] leading-relaxed text-ink-3">
         It may have been deleted, or it belongs to another member.
