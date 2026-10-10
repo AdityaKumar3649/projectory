@@ -56,6 +56,24 @@ function toId(value: unknown): string | null {
   return typeof value === "string" && value.startsWith("prj_") ? value : null;
 }
 
+/**
+ * Normalises a moderator's free-text note.
+ *
+ * Capped at 400 characters because it is stored verbatim and rendered back to
+ * the project owner on their dashboard. Rejecting rather than silently
+ * truncating would be worse here - a note is optional and the moderator should
+ * not lose their sentence to a validation error - so it is trimmed and cut.
+ *
+ * A rejection with no note gets a default, so the owner is never told "rejected"
+ * with no reason at all.
+ */
+function toNote(value: unknown, status: ProjectStatus): string | null {
+  const text = typeof value === "string" ? value.trim().slice(0, 400) : "";
+  if (text) return text;
+  if (status === "rejected") return "Did not meet the listing criteria.";
+  return null;
+}
+
 /** Everything the admin screens need, in one read so they cannot disagree. */
 export async function adminGetAllData() {
   const user = await requireUser();
@@ -81,9 +99,19 @@ export async function adminGetAllData() {
   };
 }
 
+/**
+ * Records a moderation decision on one project.
+ *
+ * Note what this does NOT write: `updatedAt`. That field means "the owner last
+ * edited this", and it is rendered to the owner as "updated 2 hours ago" on
+ * their dashboard. Writing the moderator's clock into it made a member's
+ * untouched project claim they had just edited it. Moderation has its own
+ * timestamps in `moderatedAt` / `moderatedBy`.
+ */
 export async function adminUpdateProjectStatus(
   projectId: unknown,
   status: unknown,
+  note?: unknown,
 ): Promise<AdminResult> {
   const user = await requireUser();
   if (!isAdmin(user.id)) return { ok: false, error: "You do not have admin access." };
@@ -94,15 +122,67 @@ export async function adminUpdateProjectStatus(
   const next = toStatus(status);
   if (!next) return { ok: false, error: "That status is not valid." };
 
+  const moderationNote = toNote(note, next);
+
   const result = await withDb((db) => {
     const index = db.projects.findIndex((p) => p.id === id);
     if (index === -1) return { ok: false as const, error: "That project could not be found." };
     db.projects[index] = {
       ...db.projects[index],
       status: next,
-      updatedAt: new Date().toISOString(),
+      moderatedAt: new Date().toISOString(),
+      moderatedBy: user.id,
+      moderationNote,
     };
     return { ok: true as const };
+  });
+
+  if (result.ok) revalidateAdminPaths();
+  return result;
+}
+
+/**
+ * Decides many projects at once.
+ *
+ * The cap is not decoration: `projectIds` arrives from the browser, and an
+ * unbounded list would let one request rewrite the entire table in a single
+ * write. 200 is far more than any real queue and far below that risk.
+ */
+export async function adminBulkUpdateProjectStatus(
+  projectIds: unknown,
+  status: unknown,
+): Promise<AdminResult & { updated: number }> {
+  const user = await requireUser();
+  if (!isAdmin(user.id)) return { ok: false, error: "You do not have admin access.", updated: 0 };
+
+  const next = toStatus(status);
+  if (!next) return { ok: false, error: "That status is not valid.", updated: 0 };
+
+  const ids = new Set(
+    Array.isArray(projectIds)
+      ? projectIds.filter((v): v is string => typeof v === "string" && v.startsWith("prj_")).slice(0, 200)
+      : [],
+  );
+  if (ids.size === 0) return { ok: false, error: "Nothing was selected.", updated: 0 };
+
+  const result = await withDb((db) => {
+    let updated = 0;
+    const at = new Date().toISOString();
+    db.projects = db.projects.map((p) => {
+      // Skip anything already in the target state, so the result count reflects
+      // real changes and re-running a bulk action is harmless.
+      if (!ids.has(p.id) || p.status === next) return p;
+      updated += 1;
+      return {
+        ...p,
+        status: next,
+        moderatedAt: at,
+        moderatedBy: user.id,
+        moderationNote: next === "rejected" ? "Did not meet the listing criteria." : null,
+      };
+    });
+    if (updated === 0) return { ok: false as const, error: "Nothing matched that selection.", updated: 0 };
+    return { ok: true as const, updated };
   });
 
   if (result.ok) revalidateAdminPaths();

@@ -100,6 +100,9 @@ function seed(): DbShape {
     status: partial.status,
     createdAt: partial.createdAt,
     updatedAt: partial.updatedAt,
+    moderatedAt: partial.status === "pending" ? null : partial.updatedAt,
+    moderatedBy: partial.status === "pending" ? null : demoId,
+    moderationNote: null,
   });
 
   return {
@@ -378,11 +381,43 @@ export async function readDb(): Promise<DbShape> {
   return db;
 }
 
+/**
+ * Backfills fields added after a document was first written.
+ *
+ * `parseOrSeed` is the one place every stored document passes through, so a
+ * migration here covers the file store, the Blob store and the in-memory
+ * fallback at once. It has to be non-destructive: the alternative is to delete
+ * `.data/db.json` and throw away whatever the user had actually created.
+ *
+ * Each step is guarded by checking for the field it introduced, so running this
+ * against an already-current document is a no-op rather than a rewrite.
+ */
+function migrate(db: DbShape): DbShape {
+  for (const project of db.projects) {
+    // Typed as a record rather than `Project & {...}` so the compiler does not
+    // narrow the row away once the field is known to be missing.
+    const row = project as unknown as Record<string, unknown>;
+
+    if (!("moderatedAt" in row)) {
+      // Before this field existed, moderation wrote to `updatedAt`. Nothing
+      // recorded when a decision actually happened, so fall back to whatever
+      // timestamp the row already carries rather than inventing "now".
+      row.moderatedAt = project.status === "pending" ? null : project.updatedAt;
+    }
+    if (!("moderatedBy" in row)) row.moderatedBy = null;
+    if (!("moderationNote" in row)) row.moderationNote = null;
+  }
+
+  return db;
+}
+
 /** Parses a stored document, falling back to the seed rather than throwing. */
 function parseOrSeed(raw: string): DbShape {
   try {
     const parsed = JSON.parse(raw) as DbShape;
-    if (Array.isArray(parsed.projects) && Array.isArray(parsed.accounts)) return parsed;
+    if (Array.isArray(parsed.projects) && Array.isArray(parsed.accounts)) {
+      return migrate(parsed);
+    }
   } catch {
     // fall through to the seed
   }

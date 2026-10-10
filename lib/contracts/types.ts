@@ -35,13 +35,19 @@ export interface Project {
   organizationId: string | null;
   status: ProjectStatus;
   createdAt: string;
+  /** Last time the OWNER edited it. Moderation must never write here. */
   updatedAt: string;
+  /** When a moderator last decided on it, and who. Null while still pending. */
+  moderatedAt: string | null;
+  moderatedBy: string | null;
+  /** Shown to the owner when status is rejected, so the decision explains itself. */
+  moderationNote: string | null;
 }
 
 /** The shape accepted by create/update. Server-derived fields are excluded. */
 export type ProjectInput = Omit<
   Project,
-  "id" | "ownerId" | "status" | "createdAt" | "updatedAt"
+  "id" | "ownerId" | "status" | "createdAt" | "updatedAt" | "moderatedAt" | "moderatedBy" | "moderationNote"
 >;
 
 /** The public profile of the signed-in user. */

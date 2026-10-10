@@ -56,6 +56,11 @@ export async function createProject(
       status: "pending" satisfies ProjectStatus,
       createdAt: now,
       updatedAt: now,
+      // New submissions have not been decided on yet, so the moderation
+      // columns start empty rather than inheriting the creation time.
+      moderatedAt: null,
+      moderatedBy: null,
+      moderationNote: null,
     };
     db.projects.push(project);
     return { ok: true, data: project } satisfies ActionResult<Project>;
