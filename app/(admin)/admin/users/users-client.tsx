@@ -4,8 +4,9 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { adminDeleteUser } from "@/app/actions/admin";
+import { Avatar } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Toast, useToast } from "@/components/ui/toast";
 
 export type AdminAccount = {
   id: string;
@@ -24,21 +25,25 @@ export function AdminUsersClient({
   viewerId: string;
 }) {
   const router = useRouter();
+  const { toast, show, clear } = useToast();
   const [isPending, startTransition] = useTransition();
   const [target, setTarget] = useState<AdminAccount | null>(null);
+  const [rows, setRows] = useState(accounts);
+  const [seen, setSeen] = useState(accounts);
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [toast, setToast] = useState<{ message: string; ok: boolean } | null>(null);
 
-  const showToast = (message: string, ok: boolean) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({ message, ok });
-    toastTimer.current = setTimeout(() => setToast(null), 3200);
-  };
-
-  useEffect(() => () => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-  }, []);
+  /*
+   * Adopt a new server list by adjusting state during render rather than in an
+   * effect. `router.refresh()` delivers a new `accounts` array after every
+   * action, and an effect would cost a second render pass to do it - which is
+   * what React 19's set-state-in-effect rule is about. Comparing against the
+   * last-seen array is the documented way to do this without the extra pass,
+   * and it is a no-op on every render where the prop has not changed.
+   */
+  if (accounts !== seen) {
+    setSeen(accounts);
+    setRows(accounts);
+  }
 
   useEffect(() => {
     const d = dialogRef.current;
@@ -51,41 +56,62 @@ export function AdminUsersClient({
     const victim = target;
     setTarget(null);
     if (!victim) return;
+    const before = rows;
+    // Optimistic, like the projects table. Deleting a member cascades to their
+    // profile, sessions and projects, so leaving the row on screen for half a
+    // second reads as "nothing happened".
+    setRows((prev) => prev.filter((a) => a.id !== victim.id));
+
     startTransition(async () => {
       const res = await adminDeleteUser(victim.id);
-      showToast(res.ok ? `${victim.email} deleted.` : res.error, res.ok);
+      if (!res.ok) {
+        setRows(before);
+        show({ message: res.error, tone: "error" });
+        return;
+      }
+      show({ message: `${victim.email} deleted.`, tone: "neutral" });
       router.refresh();
     });
   };
 
   return (
     <div className="flex flex-col gap-4">
+      <p className="text-[13px] text-ink-3" aria-live="polite">
+        {rows.length} {rows.length === 1 ? "member" : "members"}
+      </p>
+
       {/* Scrolls the table rather than the page: measured at 62px of document
           overflow on a 320px viewport without this. */}
-      <div className="overflow-x-auto rounded-card border border-hairline bg-surface">
+      <div className="overflow-x-auto rounded-card border border-hairline bg-surface shadow-raised">
         <table className="w-full min-w-[520px] text-left">
           <caption className="sr-only">Registered members and the actions available on each</caption>
           <thead>
             <tr className="border-b border-hairline bg-sunken">
-              <th scope="col" className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-3">Member</th>
-              <th scope="col" className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-3">Projects</th>
-              <th scope="col" className="hidden px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-3 sm:table-cell">Joined</th>
-              <th scope="col" className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-3">Actions</th>
+              <th scope="col" className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                Member
+              </th>
+              <th scope="col" className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                Projects
+              </th>
+              <th scope="col" className="hidden px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3 sm:table-cell">
+                Joined
+              </th>
+              <th scope="col" className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-hairline">
-            {accounts.map((a) => {
+            {rows.map((a) => {
               const isSelf = a.id === viewerId;
               return (
                 <tr key={a.id} className="transition-colors hover:bg-hover">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <span
-                        aria-hidden
-                        className="grid size-7 shrink-0 place-items-center rounded-pill bg-accent-soft text-[12px] font-semibold text-accent"
-                      >
-                        {a.name.charAt(0).toUpperCase()}
-                      </span>
+                      {/* The shared primitive, rather than a hand-rolled
+                          initial: it reads two initials and falls back when the
+                          avatar image fails to load. */}
+                      <Avatar name={a.name} size={28} />
                       <span className="min-w-0">
                         <span className="flex items-center gap-2">
                           <span className="truncate text-[13px] font-medium text-ink">{a.name}</span>
@@ -99,7 +125,9 @@ export function AdminUsersClient({
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-[13px] tabular-nums text-ink-2">
+                  {/* A count is a number: right-aligned, tabular, so the digits
+                      line up down the column instead of raggedly. */}
+                  <td className="px-4 py-3 text-right text-[13px] tabular-nums text-ink-2">
                     {a.projectCount}
                   </td>
                   <td className="hidden whitespace-nowrap px-4 py-3 text-[12px] text-ink-3 sm:table-cell">
@@ -123,7 +151,7 @@ export function AdminUsersClient({
                 </tr>
               );
             })}
-            {accounts.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-10 text-center text-[13px] text-ink-3">
                   No members yet.
@@ -134,11 +162,17 @@ export function AdminUsersClient({
         </table>
       </div>
 
+      {/*
+        No `backdrop:bg-ink/45` here any more. The scrim now comes from
+        `dialog::backdrop` reading --pj-scrim, which is a token that darkens in
+        both themes. The utility version resolved `ink` to near-white in dark
+        mode, so it laid a 45% white wash over the page.
+      */}
       <dialog
         ref={dialogRef}
         aria-labelledby="admin-user-dialog-title"
         onClose={() => setTarget(null)}
-        className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-card border border-hairline bg-surface p-0 text-ink shadow-pop backdrop:bg-ink/45 open:block"
+        className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-card border border-hairline bg-surface p-0 text-ink shadow-overlay open:block"
       >
         {target ? (
           <div className="flex flex-col gap-4 p-5">
@@ -162,20 +196,7 @@ export function AdminUsersClient({
         ) : null}
       </dialog>
 
-      <div role="status" aria-live="polite" className="pointer-events-none fixed bottom-5 right-5 z-50">
-        {toast ? (
-          <p
-            className={cn(
-              "rounded-card border px-4 py-2.5 text-[13px] font-medium shadow-pop",
-              toast.ok
-                ? "border-approved bg-approved text-approved-fg"
-                : "border-rejected bg-rejected text-rejected-fg",
-            )}
-          >
-            {toast.message}
-          </p>
-        ) : null}
-      </div>
+      <Toast toast={toast} onDismiss={clear} />
     </div>
   );
 }

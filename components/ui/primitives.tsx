@@ -1,8 +1,15 @@
 import type { ReactNode } from "react";
-import { CircleAlert, Clock } from "lucide-react";
+import { CircleAlert, CircleCheck, Clock, TriangleAlert } from "lucide-react";
 
 import type { ProjectStatus } from "@/lib/contracts/types";
-import { cn, initials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+
+/**
+ * Re-exported rather than redefined: the real Avatar is a Client Component
+ * (it needs `useState` for the broken-image fallback), and this module is
+ * imported by Server Components that must not pull in the hooks runtime.
+ */
+export { Avatar } from "./avatar";
 
 /**
  * Status badge. The ONLY place colour is allowed to carry meaning, and it
@@ -54,63 +61,49 @@ export function Chip({ children, className }: { children: ReactNode; className?:
   );
 }
 
-export function Avatar({
-  name,
-  src,
-  size = 32,
-  className,
-}: {
-  name: string;
-  src?: string;
-  size?: number;
-  className?: string;
-}) {
-  const label = initials(name);
-  return (
-    <span
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-pill",
-        "border border-hairline bg-sunken font-semibold text-ink-2",
-        className,
-      )}
-    >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" className="size-full object-cover" />
-      ) : (
-        label
-      )}
-    </span>
-  );
-}
-
-/** Inline notice. `tone="info"` is the review notice; `tone="error"` is a form failure. */
+/**
+ * Inline notice.
+ *
+ * `warning` and `success` were added because the admin panel needs both and
+ * there was no way to express them: `pending` already means "awaiting a
+ * moderator", so borrowing it for "something needs your attention" would break
+ * the rule in globals.css that a colour always means the same thing.
+ */
 export function Alert({
   tone = "info",
   title,
   children,
   className,
 }: {
-  tone?: "info" | "error";
+  tone?: "info" | "error" | "success" | "warning";
   title?: ReactNode;
   children?: ReactNode;
   className?: string;
 }) {
+  const icon = {
+    info: <Clock aria-hidden className="mt-px size-[17px] shrink-0 text-accent" />,
+    error: <CircleAlert aria-hidden className="mt-px size-[17px] shrink-0 text-rejected-fg" />,
+    success: <CircleCheck aria-hidden className="mt-px size-[17px] shrink-0 text-approved-fg" />,
+    warning: <TriangleAlert aria-hidden className="mt-px size-[17px] shrink-0 text-warning-fg" />,
+  }[tone];
+
   return (
     <div
-      role={tone === "error" ? "alert" : undefined}
+      // Errors interrupt; the rest wait their turn. Both were `alert` or
+      // nothing, so a success message either shouted or said nothing.
+      role={tone === "error" ? "alert" : tone === "info" ? undefined : "status"}
       className={cn(
-        "flex items-start gap-2.5 rounded-input border border-transparent p-3.5",
-        tone === "info" ? "bg-accent-soft" : "border-rejected-fg bg-rejected",
+        // rounded-card, not rounded-input: Alert and Panel are the same kind of
+        // thing at the same size and were rendering with different radii.
+        "flex items-start gap-2.5 rounded-card border border-transparent p-3.5",
+        tone === "info" && "bg-accent-soft",
+        tone === "error" && "border-rejected-fg bg-rejected",
+        tone === "success" && "bg-approved",
+        tone === "warning" && "bg-warning",
         className,
       )}
     >
-      {tone === "info" ? (
-        <Clock aria-hidden className="mt-px size-[17px] shrink-0 text-accent" />
-      ) : (
-        <CircleAlert aria-hidden className="mt-px size-[17px] shrink-0 text-rejected-fg" />
-      )}
+      {icon}
       <div className="flex flex-col gap-1">
         {title ? <p className="text-[13px] font-semibold text-ink">{title}</p> : null}
         {children ? <p className="text-[13px] leading-relaxed text-ink-2">{children}</p> : null}

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { SignOutButton } from "@/components/ui/sign-out-button";
 
 /**
  * Admin sidebar.
@@ -32,7 +33,7 @@ const ITEMS = [
   { href: "/admin/database", label: "Database", icon: Database },
 ];
 
-export function AdminNav() {
+export function AdminNav({ pendingCount = 0 }: { pendingCount?: number }) {
   const pathname = usePathname();
 
   return (
@@ -72,14 +73,26 @@ export function AdminNav() {
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex h-[34px] items-center gap-2 rounded-input px-2.5 text-[13px] whitespace-nowrap transition-colors lg:gap-2.5",
+                    "flex h-9 items-center gap-2 rounded-input px-2.5 text-[13px] whitespace-nowrap transition-colors lg:gap-2.5",
                     active
-                      ? "bg-accent-soft font-semibold text-accent"
+                      ? "bg-selected font-semibold text-accent"
                       : "font-medium text-ink-2 hover:bg-hover hover:text-ink",
                   )}
                 >
                   <Icon size={15} aria-hidden className={active ? "text-accent" : "text-ink-3"} />
                   {item.label}
+                  {/*
+                    Queue depth on the item that owns the queue. A moderator
+                    should not have to open Projects to find out there is work
+                    waiting, and the number is the only piece of state in this
+                    nav worth surfacing.
+                  */}
+                  {item.href === "/admin/projects" && pendingCount > 0 ? (
+                    <span className="ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-pill bg-pending px-1.5 text-[10px] font-bold tabular-nums text-pending-fg">
+                      {pendingCount}
+                      <span className="sr-only"> awaiting review</span>
+                    </span>
+                  ) : null}
                 </Link>
               </li>
             );
@@ -87,14 +100,20 @@ export function AdminNav() {
         </ul>
       </div>
 
-      <div className="hidden border-t border-hairline pt-2 lg:block">
+      {/*
+        Sign-out was missing entirely: there was no way to log out from anywhere
+        under /admin, on any screen size. It belongs in the sidebar foot on
+        desktop and stays in the header on a phone, where the sidebar is a bar.
+      */}
+      <div className="hidden flex-col gap-0.5 border-t border-hairline pt-2 lg:flex">
         <Link
           href="/dashboard"
-          className="flex h-[34px] items-center gap-2.5 rounded-input px-2.5 text-[13px] font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink"
+          className="flex h-9 items-center gap-2.5 rounded-input px-2.5 text-[13px] font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink"
         >
           <ArrowLeft size={15} aria-hidden className="text-ink-3" />
           Back to my projects
         </Link>
+        <SignOutButton />
       </div>
     </nav>
   );
