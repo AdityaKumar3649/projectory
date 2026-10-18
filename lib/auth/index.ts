@@ -63,6 +63,12 @@ export const getCurrentUser = cache(async (): Promise<AuthUser | null> =>
 export async function requireUser(returnTo?: string): Promise<AuthUser> {
   const user = await getCurrentUser();
   if (!user) {
+    try {
+      const jar = await cookies();
+      jar.delete(SESSION_COOKIE);
+    } catch {
+      // Cookies might be immutable in some streaming/prefetch render contexts
+    }
     redirect(returnTo ? `/sign-in?next=${encodeURIComponent(returnTo)}` : "/sign-in");
   }
   return user;

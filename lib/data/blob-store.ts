@@ -38,14 +38,19 @@ export function blobConfigured(): boolean {
 
 /** The raw JSON document, or null when nothing has been stored yet. */
 export async function readBlob(): Promise<string | null> {
-  const result = await get(PATHNAME, {
-    access: "private",
-    // Read through to origin, not the CDN cache. The database is rewritten on
-    // every write, so a cached copy would hand back stale accounts and projects.
-    useCache: false,
-  });
-  if (!result) return null;
-  return result.stream ? await new Response(result.stream).text() : null;
+  try {
+    const result = await get(PATHNAME, {
+      access: "private",
+      // Read through to origin, not the CDN cache. The database is rewritten on
+      // every write, so a cached copy would hand back stale accounts and projects.
+      useCache: false,
+    });
+    if (!result) return null;
+    return result.stream ? await new Response(result.stream).text() : null;
+  } catch (err) {
+    console.warn("[projectory] readBlob error:", err);
+    return null;
+  }
 }
 
 /**
@@ -60,8 +65,8 @@ export async function writeBlob(json: string): Promise<void> {
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: "application/json",
-    // The database changes on every write; a cached copy would resurrect
-    // stale accounts and projects for up to a month.
-    cacheControlMaxAge: 60,
+    // Must be 0 so Vercel edge/CDN never serves a stale database snapshot
+    // to any serverless container.
+    cacheControlMaxAge: 0,
   });
 }

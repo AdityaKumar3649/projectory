@@ -218,7 +218,10 @@ function seed(): DbShape {
  */
 let writable: boolean | null = null;
 let memory: DbShape | null = null;
-async function canWrite(): Promise<boolean> {
+let memoryLoadedAt = 0;
+const MEMORY_TTL_MS = 2500;
+
+export async function canWrite(): Promise<boolean> {
   if (writable !== null) return writable;
   const fs = await import("node:fs/promises");
   try {
@@ -239,8 +242,8 @@ async function canWrite(): Promise<boolean> {
 }
 
 /** True when the document lives in Blob rather than in memory. */
-function usesBlob(): boolean {
-  return !writable && blobConfigured();
+export function usesBlob(): boolean {
+  return writable === false && blobConfigured();
 }
 
 /**
@@ -259,6 +262,7 @@ async function persist(db: DbShape): Promise<void> {
     await writeBlob(JSON.stringify(db, null, 2));
   }
   memory = db;
+  memoryLoadedAt = Date.now();
 }
 
 async function ensureDb(): Promise<void> {
@@ -335,17 +339,16 @@ async function writeAtomic(db: DbShape): Promise<void> {
  * With no writable filesystem the in-memory copy is the database: seeded on
  * first read and mutated in place by `withDb`.
  */
-export async function readDb(): Promise<DbShape> {
+export async function readDb(forceFresh = false): Promise<DbShape> {
   if (!(await canWrite())) {
     if (usesBlob()) {
-      if (!memory) {
-        // Read once per instance and keep the snapshot in memory. Every request
-        // hitting Blob would be a network round trip on the hot path, and the
-        // snapshot still gets rewritten on each write via `persist`.
+      const isStale = !memory || forceFresh || Date.now() - memoryLoadedAt > MEMORY_TTL_MS;
+      if (isStale || !memory) {
         const raw = await readBlob();
         memory = raw ? parseOrSeed(raw) : await seedBlob();
+        memoryLoadedAt = Date.now();
       }
-      return memory;
+      return memory ?? seed();
     }
     if (!memory) memory = seed();
     return memory;
@@ -456,9 +459,13 @@ async function seedBlob(): Promise<DbShape> {
  * the shared object IS the persistence, so the write-back is skipped rather than
  * allowed to throw and surface as a 500 for a request that actually succeeded.
  */
-export function withDb<T>(mutator: (db: DbShape) => T | Promise<T>, write = true): Promise<T> {
+export function withDb<T>(
+  mutator: (db: DbShape) => T | Promise<T>,
+  write = true,
+  forceFresh = false,
+): Promise<T> {
   const run = queue.then(async () => {
-    const db = await readDb();
+    const db = await readDb(forceFresh);
     const result = await mutator(db);
     if (write) await persist(db);
     return result;
@@ -479,6 +486,6 @@ export function withDb<T>(mutator: (db: DbShape) => T | Promise<T>, write = true
  * on every authenticated request. On the Blob backend that turned each page
  * view into a versioned object overwrite.
  */
-export function readDbQueued(): Promise<DbShape> {
-  return withDb((db) => db, false);
+export function readDbQueued(forceFresh = false): Promise<DbShape> {
+  return withDb((db) => db, false, forceFresh);
 }
